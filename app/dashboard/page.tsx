@@ -96,7 +96,7 @@ export default async function CustomerDashboard() {
         <section className="customer-welcome">
           <div>
             <p className="customer-overline">Dashboard Pelanggan</p>
-            <h1>Selamat datang kembali, {profile.name || "Pelanggan"}.</h1>
+            <h1>Selamat datang, {profile.name || "Pelanggan"}.</h1>
             <p className="customer-lead">
               Kelola jadwal kebersihan rumah, langganan rutin, dan pantau status petugas Anda.
             </p>
