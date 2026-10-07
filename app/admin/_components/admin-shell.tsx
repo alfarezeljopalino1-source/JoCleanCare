@@ -8,9 +8,11 @@ import type { UserRole } from "../../../lib/auth/roles";
 const links = [
   ["/admin", "Ringkasan"],
   ["/admin/orders", "Pesanan"],
-  ["/admin/services", "Layanan"],
+  ["/admin/services", "Layanan & Add-on"],
   ["/admin/staff", "Petugas"],
   ["/admin/schedules", "Jadwal"],
+  ["/admin/customers", "Pelanggan"],
+  ["/admin/notifications", "Notifikasi"],
 ] as const;
 
 export function AdminShell({ children, name }: { children: React.ReactNode; name: string }) {

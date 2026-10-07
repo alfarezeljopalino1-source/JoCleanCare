@@ -11,7 +11,7 @@ export function SessionNav({ profile }: { profile: { name: string; role: UserRol
   const profileUrl = profile.role === "customer" ? "/profile" : profile.role === "staff" ? "/staff/profile" : null;
   const links = [
     { href: dashboardForRole(profile.role), label: "Dashboard" },
-    ...(profile.role === "customer" ? [{ href: "/layanan", label: "Layanan" }, { href: "/orders", label: "Pesanan" }] : []),
+    ...(profile.role === "customer" ? [{ href: "/layanan", label: "Layanan" }, { href: "/paket", label: "Paket Rutin" }, { href: "/orders", label: "Pesanan" }] : []),
     ...(profile.role === "staff" ? [{ href: "/staff/schedules", label: "Jadwal" }] : []),
     ...(profileUrl ? [{ href: profileUrl, label: "Profil" }] : []),
   ];
