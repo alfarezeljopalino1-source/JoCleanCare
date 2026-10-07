@@ -5,11 +5,14 @@ import {
   formatBookingDate,
   formatRupiah,
   housingTypes,
+  jakartaToday,
   recurringOptions,
+  standardTimeSlots,
 } from "../../../lib/bookings";
 import { requireRole } from "../../../lib/auth/session";
 import {
   cancelBookingAction,
+  rescheduleBookingAction,
   sendBookingMessageAction,
   submitReviewAction,
   toggleFavoriteCleanerAction,
@@ -17,8 +20,14 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function OrderDetailPage({ params }: PageProps<"/orders/[id]">) {
+export default async function OrderDetailPage({
+  params,
+  searchParams,
+}: PageProps<"/orders/[id]">) {
   const { id } = await params;
+  const sParams = await searchParams;
+  const okMessage = typeof sParams.ok === "string" ? sParams.ok : null;
+  const errorMessage = typeof sParams.error === "string" ? sParams.error : null;
   const { supabase, user } = await requireRole(["customer"]);
 
   // 1. Fetch booking with service and add-ons
@@ -112,6 +121,8 @@ export default async function OrderDetailPage({ params }: PageProps<"/orders/[id
     { key: "completed", label: "Selesai", done: booking.status === "completed" },
   ];
 
+  const bookingCode = `JC-${booking.id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+
   return (
     <main className="customer-page order-tracking-page">
       <div className="customer-container customer-narrow">
@@ -119,10 +130,21 @@ export default async function OrderDetailPage({ params }: PageProps<"/orders/[id
           <span aria-hidden="true">←</span> Kembali ke daftar pesanan
         </Link>
 
+        {okMessage && (
+          <div className="customer-notice customer-notice-success mb-4" role="status">
+            ✓ {okMessage}
+          </div>
+        )}
+        {errorMessage && (
+          <div className="customer-notice customer-notice-error mb-4" role="alert">
+            ✕ {errorMessage}
+          </div>
+        )}
+
         {/* Order Header */}
         <header className="order-detail-header">
           <div>
-            <p className="customer-overline">Pesanan #{booking.id.slice(0, 8)}</p>
+            <p className="customer-overline font-mono font-semibold">Nomor Booking: {bookingCode}</p>
             <h1>{service?.name ?? "Layanan JoCleanCare"}</h1>
             <p className="order-header-meta">
               {formatBookingDate(booking.booking_date)} · {String(booking.start_time).slice(0, 5)} WIB · Dibuat{" "}
@@ -188,18 +210,23 @@ export default async function OrderDetailPage({ params }: PageProps<"/orders/[id
                 </div>
               </div>
 
-              {/* Favorite cleaner toggle */}
-              <form action={toggleFavoriteCleanerAction} className="cleaner-fav-form">
-                <input type="hidden" name="staff_id" value={assignedCleaner.staff_id} />
-                <input type="hidden" name="is_favorite" value={String(isCleanerFavorite)} />
-                <button
-                  type="submit"
-                  className={`cleaner-fav-btn ${isCleanerFavorite ? "is-favorited" : ""}`}
-                  title={isCleanerFavorite ? "Hapus dari favorit" : "Jadikan petugas favorit"}
-                >
-                  {isCleanerFavorite ? "★ Petugas Favorit" : "☆ Simpan ke Favorit"}
-                </button>
-              </form>
+              {/* Favorite cleaner toggle & Chat cleaner */}
+              <div className="cleaner-actions-row">
+                <a href="#chat-section" className="cleaner-chat-btn">
+                  💬 Chat Petugas
+                </a>
+                <form action={toggleFavoriteCleanerAction} className="cleaner-fav-form">
+                  <input type="hidden" name="staff_id" value={assignedCleaner.staff_id} />
+                  <input type="hidden" name="is_favorite" value={String(isCleanerFavorite)} />
+                  <button
+                    type="submit"
+                    className={`cleaner-fav-btn ${isCleanerFavorite ? "is-favorited" : ""}`}
+                    title={isCleanerFavorite ? "Hapus dari favorit" : "Jadikan petugas favorit"}
+                  >
+                    {isCleanerFavorite ? "★ Petugas Favorit" : "☆ Simpan ke Favorit"}
+                  </button>
+                </form>
+              </div>
             </div>
 
             <div className="cleaner-schedule-details">
@@ -274,7 +301,7 @@ export default async function OrderDetailPage({ params }: PageProps<"/orders/[id
 
         {/* BOOKING CHAT (Section 17) */}
         {!isCancelled && (
-          <section className="order-chat-section">
+          <section id="chat-section" className="order-chat-section">
             <div className="chat-section-header">
               <h2>Pesan & Komunikasi Booking</h2>
               <p>Kirim pesan langsung ke petugas atau admin terkait kunjungan ini.</p>
@@ -389,7 +416,56 @@ export default async function OrderDetailPage({ params }: PageProps<"/orders/[id
           </div>
         </section>
 
-        {/* CANCELLATION WORKFLOW (Section 11) */}
+        {/* RESCHEDULE WORKFLOW (Tahap 20 Spec) */}
+        {canCancel && (
+          <section className="order-reschedule-section">
+            <details className="reschedule-details-dropdown">
+              <summary className="reschedule-summary-trigger">
+                📅 Ingin menjadwalkan ulang (reschedule) pesanan ini?
+              </summary>
+              <form action={rescheduleBookingAction} className="reschedule-form">
+                <input type="hidden" name="booking_id" value={booking.id} />
+                <p>
+                  Anda dapat mengubah tanggal dan waktu kunjungan selama pesanan masih menunggu konfirmasi atau
+                  dikonfirmasi sebelum petugas berangkat.
+                </p>
+                <div className="reschedule-inputs-grid">
+                  <label className="customer-field-label">
+                    Pilih Tanggal Baru
+                    <input
+                      type="date"
+                      name="new_date"
+                      min={jakartaToday()}
+                      defaultValue={booking.booking_date}
+                      required
+                      className="customer-field"
+                    />
+                  </label>
+                  <label className="customer-field-label">
+                    Pilih Jam Baru (WIB)
+                    <select
+                      name="new_time"
+                      defaultValue={String(booking.start_time).slice(0, 5)}
+                      required
+                      className="customer-field"
+                    >
+                      {standardTimeSlots.map((slot) => (
+                        <option key={slot} value={slot}>
+                          {slot} WIB
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <button type="submit" className="customer-button customer-button-primary reschedule-submit-button">
+                  Konfirmasi Jadwal Baru
+                </button>
+              </form>
+            </details>
+          </section>
+        )}
+
+        {/* CANCELLATION WORKFLOW (Section 11 / Tahap 20 Spec) */}
         {canCancel && (
           <section className="order-cancel-section">
             <details className="cancel-details-dropdown">

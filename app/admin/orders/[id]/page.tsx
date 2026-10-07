@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "../../../../lib/auth/session";
-import { assignStaffAction, setBookingStatusAction } from "../../actions";
+import {
+  adminCancelBookingAction,
+  adminRescheduleBookingAction,
+  assignStaffAction,
+  setBookingStatusAction,
+} from "../../actions";
 import { sendBookingMessageAction } from "../../../actions/bookings";
 import {
   Feedback,
@@ -261,6 +266,55 @@ export default async function AdminOrderDetailPage({
             <p className="admin-inline-note">
               Tidak ada transisi manual berikutnya untuk status saat ini.
             </p>
+          )}
+
+          {/* Admin Reschedule & Cancel Controls */}
+          {!["completed", "cancelled"].includes(row.status) && (
+            <div className="mt-4 pt-4 border-t border-gray-100 space-y-4">
+              <details className="text-xs">
+                <summary className="font-semibold text-teal-700 cursor-pointer">
+                  🗓️ Ubah Jadwal Booking (Admin Reschedule)
+                </summary>
+                <form action={adminRescheduleBookingAction} className="mt-2 space-y-2 p-3 bg-gray-50 rounded">
+                  <input type="hidden" name="booking_id" value={row.id} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <label>
+                      Tanggal Baru
+                      <input name="booking_date" type="date" defaultValue={row.booking_date} required />
+                    </label>
+                    <label>
+                      Jam Baru
+                      <input name="start_time" type="time" defaultValue={String(row.start_time).slice(0, 5)} required />
+                    </label>
+                  </div>
+                  <button type="submit" className="admin-button admin-button-compact admin-button-primary">
+                    Simpan Jadwal Baru
+                  </button>
+                </form>
+              </details>
+
+              <details className="text-xs">
+                <summary className="font-semibold text-red-700 cursor-pointer">
+                  ⚠️ Batalkan Booking (Admin Cancel)
+                </summary>
+                <form action={adminCancelBookingAction} className="mt-2 space-y-2 p-3 bg-red-50 rounded">
+                  <input type="hidden" name="booking_id" value={row.id} />
+                  <label>
+                    Alasan Pembatalan
+                    <textarea
+                      name="cancellation_reason"
+                      rows={2}
+                      maxLength={500}
+                      required
+                      placeholder="Tulis alasan pembatalan (misal: permintaan pelanggan via telepon, kendala cuaca, dsb.)"
+                    />
+                  </label>
+                  <button type="submit" className="admin-button admin-button-compact bg-red-700 text-white hover:bg-red-800">
+                    Konfirmasi Pembatalan Booking
+                  </button>
+                </form>
+              </details>
+            </div>
           )}
 
           {/* Customer Review display if completed */}

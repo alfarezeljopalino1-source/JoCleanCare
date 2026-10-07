@@ -92,6 +92,42 @@ export const roomOptions = [
   { value: "4_plus_rooms", label: "4+ Kamar / Ruangan", estimate: "Cocok untuk hunian > 100 m²" },
 ];
 
+export const cleaningRoomOptions = [
+  { id: "Ruang tamu", label: "Ruang tamu", desc: "Sofa, meja tamu, karpet, debu perabot & ventilasi" },
+  { id: "Kamar tidur", label: "Kamar tidur", desc: "Merapikan ranjang, lap meja rias, lemari & lantai" },
+  { id: "Kamar mandi", label: "Kamar mandi", desc: "Wastafel, kloset, shower screen & lantai kamar mandi" },
+  { id: "Dapur", label: "Dapur", desc: "Kitchen sink, meja kompor luar, counter top & buang sampah" },
+  { id: "Balkon", label: "Balkon / Teras", desc: "Lantai teras, railing balkon, kaca luar & sudut debu" },
+  { id: "Ruang kerja", label: "Ruang kerja", desc: "Meja kerja, rak buku, kursi, sanitasi keyboard/layar luar" },
+  { id: "Area lainnya", label: "Area lainnya", desc: "Area tangga, lorong koridor, atau ruang utilitas" },
+];
+
+export function getServiceSuitability(serviceName?: string) {
+  const name = (serviceName || "").toLowerCase();
+  if (name.includes("office") || name.includes("kantor")) {
+    return {
+      housingTypes: ["Kantor / Ruko", "Coworking Space", "Studio Bisnis", "Lainnya"],
+      areas: ["Ruang kerja / meja staf", "Ruang meeting", "Pantry & sink", "Toilet kantor", "Lobi & resepsionis", "Area koridor"],
+    };
+  }
+  if (name.includes("deep")) {
+    return {
+      housingTypes: ["Rumah Tapak", "Apartemen", "Kos / Studio", "Kantor / Ruko", "Lainnya"],
+      areas: ["Seluruh kamar mandi berkerak", "Dapur & area grease", "Kamar tidur utama", "Ruang tamu & keluarga", "Balkon & teras", "Kusen & sudut mati"],
+    };
+  }
+  if (name.includes("move in") || name.includes("move out") || name.includes("pindahan")) {
+    return {
+      housingTypes: ["Rumah Baru / Bekas", "Apartemen Siap Huni", "Kamar Kos Kosong", "Ruko Siap Pakai"],
+      areas: ["Seluruh kabinet dalam-luar", "Kamar mandi total", "Dapur & kitchen set", "Lantai & plin seluruh ruangan", "Jendela, pintu & ventilasi", "Balkon & koridor"],
+    };
+  }
+  return {
+    housingTypes: ["Rumah Tapak", "Apartemen", "Kos / Kamar Pribadi", "Kantor Kecil", "Lainnya"],
+    areas: ["Ruang tamu & keluarga", "Kamar tidur", "Kamar mandi", "Dapur & area makan", "Balkon / teras santai", "Ruang kerja"],
+  };
+}
+
 export const durationOptions = [
   { hours: 2, label: "2 Jam", desc: "Pembersihan rutin standar (1-2 ruangan)" },
   { hours: 3, label: "3 Jam", desc: "Pembersihan lebih detail & dapur (2-3 ruangan)" },

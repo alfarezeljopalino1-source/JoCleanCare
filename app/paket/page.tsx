@@ -1,5 +1,14 @@
 import Link from "next/link";
-import { formatRupiah } from "../../lib/bookings";
+import { getSignedInProfile } from "../../lib/auth/session";
+import {
+  bookingStatuses,
+  formatBookingDate,
+  formatRupiah,
+  recurringOptions,
+} from "../../lib/bookings";
+import { createClient } from "../../lib/supabase/server";
+
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Paket Langganan Rutin | JoCleanCare",
@@ -72,7 +81,47 @@ const subscriptionPackages = [
   },
 ];
 
-export default function SubscriptionPackagesPage() {
+export default async function SubscriptionPackagesPage() {
+  let activeRecurringList: Array<{
+    id: string;
+    booking_date: string;
+    start_time: string;
+    total_price: number;
+    address: string;
+    recurring_frequency: string;
+    status: string;
+    services: { name: string } | { name: string }[] | null;
+  }> = [];
+
+  try {
+    const signedIn = await getSignedInProfile();
+    if (signedIn && signedIn.profile.role === "customer") {
+      const supabase = await createClient();
+      const { data } = await supabase
+        .from("bookings")
+        .select(`
+          id,
+          booking_date,
+          start_time,
+          total_price,
+          address,
+          recurring_frequency,
+          status,
+          services (name)
+        `)
+        .eq("customer_id", signedIn.user.id)
+        .neq("recurring_frequency", "one_time")
+        .not("status", "in", "(completed,cancelled)")
+        .order("booking_date", { ascending: true });
+
+      if (data) {
+        activeRecurringList = data as unknown as typeof activeRecurringList;
+      }
+    }
+  } catch {
+    // If not signed in, proceed to show public packages
+  }
+
   return (
     <main className="customer-page packages-page">
       <div className="customer-container">
@@ -89,6 +138,69 @@ export default function SubscriptionPackagesPage() {
             Pilih paket kunjungan berkala bulanan dengan tarif lebih hemat dan jaminan ketersediaan slot petugas kebersihan.
           </p>
         </header>
+
+        {/* ACTIVE PACKAGES FOR LOGGED IN CUSTOMER (Tahap 21 Spec) */}
+        {activeRecurringList.length > 0 && (
+          <section className="active-packages-section my-8">
+            <div className="section-head mb-4">
+              <span className="customer-overline">Langganan Anda</span>
+              <h2>Paket Rutin Aktif</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {activeRecurringList.map((item) => {
+                const serviceName = Array.isArray(item.services)
+                  ? item.services[0]?.name
+                  : item.services?.name || "Layanan Rutin";
+                const freqLabel =
+                  recurringOptions[item.recurring_frequency as keyof typeof recurringOptions]?.label ||
+                  item.recurring_frequency;
+
+                return (
+                  <article key={item.id} className="border border-teal-200 bg-teal-50/50 rounded-xl p-5 shadow-sm">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <span className="text-xs font-bold text-teal-800 uppercase tracking-wider">
+                          Paket Aktif · {freqLabel}
+                        </span>
+                        <h3 className="text-lg font-bold text-teal-950 mt-1">{serviceName}</h3>
+                      </div>
+                      <span className={`customer-status customer-status-${item.status}`}>
+                        {bookingStatuses[item.status] ?? item.status}
+                      </span>
+                    </div>
+
+                    <dl className="mt-4 grid grid-cols-2 gap-2 text-sm text-slate-700">
+                      <div>
+                        <dt className="text-xs text-slate-500">Kunjungan Berikutnya</dt>
+                        <dd className="font-semibold text-slate-900">
+                          {formatBookingDate(item.booking_date)} pukul {String(item.start_time).slice(0, 5)} WIB
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-slate-500">Biaya Kunjungan</dt>
+                        <dd className="font-bold text-teal-800">{formatRupiah(Number(item.total_price))}</dd>
+                      </div>
+                      <div className="col-span-2">
+                        <dt className="text-xs text-slate-500">Alamat Layanan</dt>
+                        <dd className="text-xs truncate">{item.address}</dd>
+                      </div>
+                    </dl>
+
+                    <div className="mt-4 pt-3 border-t border-teal-100 flex items-center justify-between">
+                      <small className="text-xs text-teal-700">Reschedule & chat tersedia</small>
+                      <Link
+                        href={`/orders/${item.id}`}
+                        className="customer-button customer-button-primary text-xs py-1.5 px-3"
+                      >
+                        Kelola Paket →
+                      </Link>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* Package Grid */}
         <div className="packages-grid mt-8">

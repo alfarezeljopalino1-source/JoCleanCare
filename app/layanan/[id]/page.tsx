@@ -4,6 +4,7 @@ import {
   formatRupiah,
   getActiveAddOns,
   getServiceById,
+  getServiceSuitability,
   type AddOn,
   type Service,
 } from "../../../lib/bookings";
@@ -29,6 +30,7 @@ export default async function ServiceDetailPage({
 
   const service = serviceRes.data as unknown as Service;
   const addOns = (addOnsRes.data ?? []) as unknown as AddOn[];
+  const suitability = getServiceSuitability(service.name);
 
   const included =
     service.whats_included && service.whats_included.length > 0
@@ -134,6 +136,47 @@ export default async function ServiceDetailPage({
                   </li>
                 ))}
               </ul>
+            </article>
+          </div>
+        </section>
+
+        {/* Housing Types & Cleanable Areas (Tahap 2 Spec) */}
+        <section className="service-suitability-section">
+          <div className="suitability-grid">
+            <article className="suitability-box">
+              <div className="suitability-header">
+                <span className="suitability-icon">🏢</span>
+                <div>
+                  <p className="customer-overline">Kesesuaian Properti</p>
+                  <h2>Tipe Hunian yang Sesuai</h2>
+                </div>
+              </div>
+              <p className="suitability-intro">Layanan ini dirancang dan terbukti optimal untuk jenis bangunan berikut:</p>
+              <div className="suitability-tags">
+                {suitability.housingTypes.map((type, idx) => (
+                  <span key={idx} className="suitability-tag">
+                    <span className="tag-check">✓</span> {type}
+                  </span>
+                ))}
+              </div>
+            </article>
+
+            <article className="suitability-box">
+              <div className="suitability-header">
+                <span className="suitability-icon">🚪</span>
+                <div>
+                  <p className="customer-overline">Cakupan Ruang</p>
+                  <h2>Ruangan / Area yang Dapat Dibersihkan</h2>
+                </div>
+              </div>
+              <p className="suitability-intro">Petugas kami dapat menjangkau dan membersihkan area-area ini:</p>
+              <div className="suitability-tags">
+                {suitability.areas.map((area, idx) => (
+                  <span key={idx} className="suitability-tag area-tag">
+                    <span className="tag-dot">•</span> {area}
+                  </span>
+                ))}
+              </div>
             </article>
           </div>
         </section>

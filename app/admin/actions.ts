@@ -228,3 +228,201 @@ export async function assignStaffAction(data: FormData) {
   revalidatePath("/staff/schedules");
   resultUrl(back, "Petugas berhasil dijadwalkan.");
 }
+
+export async function saveStaffAction(data: FormData) {
+  const { supabase } = await requireRole(["admin"]);
+  const id = readText(data, "id");
+  const name = readText(data, "name");
+  const email = readText(data, "email").toLowerCase();
+  const phone = readText(data, "phone");
+  const isActive = data.get("is_active") === "on";
+
+  if (!name || name.length < 2) {
+    resultUrl("/admin/staff", "Nama petugas wajib diisi.", "error");
+  }
+
+  if (id) {
+    if (!/^[0-9a-f-]{36}$/i.test(id)) {
+      resultUrl("/admin/staff", "ID petugas tidak valid.", "error");
+    }
+    const updatePayload: Record<string, unknown> = {
+      name,
+      phone: phone || null,
+      is_active: isActive,
+    };
+    const { error } = await supabase
+      .from("profiles")
+      .update(updatePayload)
+      .eq("id", id)
+      .eq("role", "staff");
+
+    if (error) {
+      resultUrl("/admin/staff", `Gagal memperbarui data petugas: ${error.message}`, "error");
+    }
+    revalidatePath("/admin/staff");
+    resultUrl("/admin/staff", "Data petugas berhasil diperbarui.");
+  }
+
+  // Adding/Promoting new staff by email
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    resultUrl("/admin/staff", "Email petugas tidak valid.", "error");
+  }
+
+  // Check if profile exists with this email
+  const { data: existingUser } = await supabase
+    .from("profiles")
+    .select("id, role, name")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (!existingUser) {
+    resultUrl(
+      "/admin/staff",
+      `Akun dengan email ${email} belum terdaftar di JoCleanCare. Petugas baru perlu membuat akun terlebih dahulu melalui halaman pendaftaran, lalu Anda dapat menetapkan perannya sebagai staff.`,
+      "error"
+    );
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      role: "staff",
+      name: name || existingUser.name,
+      phone: phone || null,
+      is_active: true,
+    })
+    .eq("id", existingUser.id);
+
+  if (error) {
+    resultUrl("/admin/staff", `Gagal menetapkan akun sebagai petugas: ${error.message}`, "error");
+  }
+
+  // Send notification to the newly promoted staff
+  await supabase.from("notifications").insert({
+    user_id: existingUser.id,
+    title: "Akun Ditetapkan Sebagai Staff",
+    message: "Selamat! Akun Anda telah diaktifkan sebagai Petugas Kebersihan Resmi JoCleanCare oleh Administrator.",
+    link: "/staff",
+    type: "assignment",
+  });
+
+  revalidatePath("/admin/staff");
+  revalidatePath("/admin");
+  resultUrl("/admin/staff", `Akun ${email} berhasil diaktifkan sebagai staff kebersihan.`);
+}
+
+export async function toggleStaffStatusAction(data: FormData) {
+  const { supabase } = await requireRole(["admin"]);
+  const staffId = readText(data, "staff_id");
+  const targetActive = data.get("is_active") === "true";
+
+  if (!/^[0-9a-f-]{36}$/i.test(staffId)) {
+    resultUrl("/admin/staff", "Petugas tidak valid.", "error");
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ is_active: targetActive })
+    .eq("id", staffId)
+    .eq("role", "staff");
+
+  if (error) {
+    resultUrl("/admin/staff", `Gagal mengubah status petugas: ${error.message}`, "error");
+  }
+
+  revalidatePath("/admin/staff");
+  resultUrl(
+    "/admin/staff",
+    targetActive ? "Petugas telah diaktifkan kembali." : "Petugas telah dinonaktifkan dari penugasan."
+  );
+}
+
+export async function adminRescheduleBookingAction(data: FormData) {
+  const { supabase } = await requireRole(["admin"]);
+  const bookingId = readText(data, "booking_id");
+  const newDate = readText(data, "booking_date");
+  const newTime = readText(data, "start_time");
+  const back = `/admin/orders/${bookingId}`;
+
+  if (!/^[0-9a-f-]{36}$/i.test(bookingId)) {
+    resultUrl("/admin/orders", "ID booking tidak valid.", "error");
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(newTime)) {
+    resultUrl(back, "Tanggal atau jam baru tidak valid.", "error");
+  }
+
+  const { error: bError } = await supabase
+    .from("bookings")
+    .update({ booking_date: newDate, start_time: newTime })
+    .eq("id", bookingId);
+
+  if (bError) {
+    resultUrl(back, `Gagal mengubah jadwal: ${bError.message}`, "error");
+  }
+
+  // Sync any staff schedule that isn't cancelled
+  await supabase
+    .from("staff_schedules")
+    .update({ scheduled_date: newDate, start_time: newTime })
+    .eq("booking_id", bookingId)
+    .neq("status", "cancelled");
+
+  // Notify customer
+  const { data: booking } = await supabase.from("bookings").select("customer_id, services(name)").eq("id", bookingId).maybeSingle();
+  if (booking?.customer_id) {
+    await supabase.from("notifications").insert({
+      user_id: booking.customer_id,
+      title: "Jadwal Pesanan Disesuaikan oleh Admin",
+      message: `Jadwal pesanan Anda (#${bookingId.slice(0, 8)}) telah dijadwalkan ulang ke ${newDate} pukul ${newTime} WIB.`,
+      link: `/orders/${bookingId}`,
+      type: "schedule",
+    });
+  }
+
+  revalidatePath(back);
+  revalidatePath("/admin/orders");
+  revalidatePath("/admin/schedules");
+  revalidatePath(`/orders/${bookingId}`);
+  resultUrl(back, "Jadwal booking berhasil disesuaikan.");
+}
+
+export async function adminCancelBookingAction(data: FormData) {
+  const { supabase } = await requireRole(["admin"]);
+  const bookingId = readText(data, "booking_id");
+  const reason = readText(data, "cancellation_reason");
+  const back = `/admin/orders/${bookingId}`;
+
+  if (!/^[0-9a-f-]{36}$/i.test(bookingId)) {
+    resultUrl("/admin/orders", "ID booking tidak valid.", "error");
+  }
+
+  const { error } = await supabase
+    .from("bookings")
+    .update({
+      status: "cancelled",
+      cancellation_reason: reason || "Dibatalkan oleh administrator.",
+    })
+    .eq("id", bookingId);
+
+  if (error) {
+    resultUrl(back, `Gagal membatalkan booking: ${error.message}`, "error");
+  }
+
+  // Notify customer
+  const { data: booking } = await supabase.from("bookings").select("customer_id, services(name)").eq("id", bookingId).maybeSingle();
+  if (booking?.customer_id) {
+    await supabase.from("notifications").insert({
+      user_id: booking.customer_id,
+      title: "Pesanan Dibatalkan oleh Admin",
+      message: `Pesanan #${bookingId.slice(0, 8)} dibatalkan oleh admin dengan alasan: ${reason || "Operasional"}.`,
+      link: `/orders/${bookingId}`,
+      type: "status",
+    });
+  }
+
+  revalidatePath(back);
+  revalidatePath("/admin/orders");
+  revalidatePath(`/orders/${bookingId}`);
+  resultUrl(back, "Booking berhasil dibatalkan.");
+}
+

@@ -30,7 +30,7 @@ export default async function CustomerDashboard() {
         .eq("status", "completed"),
       supabase
         .from("bookings")
-        .select("id, booking_date, start_time, status, services(name)")
+        .select("id, booking_date, start_time, address, status, services(name)")
         .eq("customer_id", user.id)
         .gte("booking_date", jakartaToday())
         .not("status", "in", "(completed,cancelled)")
@@ -62,10 +62,21 @@ export default async function CustomerDashboard() {
     id: string;
     booking_date: string;
     start_time: string;
+    address?: string;
     status: string;
     services: { name: string } | { name: string }[] | null;
   } | null;
   const nextService = Array.isArray(nextBooking?.services) ? nextBooking.services[0] : nextBooking?.services;
+
+  let nextCleanerName: string | null = null;
+  if (nextBooking?.id) {
+    const { data: staffList } = await supabase.rpc("get_customer_booking_staff", {
+      p_booking_id: nextBooking.id,
+    });
+    if (Array.isArray(staffList) && staffList.length > 0) {
+      nextCleanerName = staffList[0].staff_name;
+    }
+  }
 
   return (
     <main className="customer-page customer-dashboard-page">
@@ -90,12 +101,18 @@ export default async function CustomerDashboard() {
               Kelola jadwal kebersihan rumah, langganan rutin, dan pantau status petugas Anda.
             </p>
           </div>
-          <div className="flex gap-2">
-            <Link href="/paket" className="customer-button customer-button-link">
-              Paket Rutin
-            </Link>
+          <div className="dashboard-quick-actions-bar mt-4 flex flex-wrap gap-2.5">
             <Link href="/booking" className="customer-button customer-button-primary">
               Pesan Layanan <span aria-hidden="true">→</span>
+            </Link>
+            <Link href="/orders" className="customer-button customer-button-secondary">
+              Lihat Pesanan
+            </Link>
+            <Link href="/profile" className="customer-button customer-button-secondary">
+              Alamat Saya
+            </Link>
+            <Link href="/paket" className="customer-button customer-button-secondary">
+              Paket Rutin
             </Link>
           </div>
         </section>
@@ -112,7 +129,7 @@ export default async function CustomerDashboard() {
           </Link>
         </section>
 
-        {/* Next Visit Banner */}
+        {/* Next Visit Banner (Tahap 22 Spec) */}
         <section className="customer-next-visit" aria-labelledby="next-visit-title">
           <div>
             <p className="customer-overline">Agenda Terdekat</p>
@@ -123,10 +140,16 @@ export default async function CustomerDashboard() {
               Jadwal belum dapat dimuat.
             </p>
           ) : nextBooking ? (
-            <Link href={`/orders/${nextBooking.id}`}>
+            <Link href={`/orders/${nextBooking.id}`} className="next-booking-card-link">
               <strong>{nextService?.name ?? "Layanan JoCleanCare"}</strong>
-              <span>
+              <span className="next-booking-schedule">
                 {formatBookingDate(nextBooking.booking_date)} · {String(nextBooking.start_time).slice(0, 5)} WIB
+              </span>
+              {nextBooking.address && (
+                <small className="next-booking-address">📍 {nextBooking.address}</small>
+              )}
+              <span className="next-booking-cleaner">
+                👤 {nextCleanerName ? `Petugas: ${nextCleanerName}` : "Menunggu konfirmasi petugas"}
               </span>
               <span className={`customer-status customer-status-${nextBooking.status}`}>
                 {bookingStatuses[nextBooking.status] ?? nextBooking.status}

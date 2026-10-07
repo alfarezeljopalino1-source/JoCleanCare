@@ -2,16 +2,20 @@
 
 import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
-import { createBooking, type BookingFormState } from "../actions/bookings";
+import {
+  checkAvailableSlotsAction,
+  createBooking,
+  type BookingFormState,
+} from "../actions/bookings";
 import {
   bookingStatuses,
   calculateServerPriceBreakdown,
+  cleaningRoomOptions,
   durationOptions,
   formatBookingDate,
   formatRupiah,
   housingTypes,
   recurringOptions,
-  roomOptions,
   standardTimeSlots,
   type AddOn,
   type CustomerAddress,
@@ -43,23 +47,32 @@ export function BookingForm({
 }: BookingFormProps) {
   const [state, formAction, pending] = useActionState(createBooking, initialState);
 
-  // Multi-step progressive disclosure (Steps 1 to 4 groups)
-  // Step 1: Layanan & Hunian (Service, Housing Type, Rooms, Duration)
-  // Step 2: Layanan Tambahan (Add-ons) & Preferensi Rutin
-  // Step 3: Jadwal & Waktu
-  // Step 4: Alamat & Kontak, Review & Konfirmasi
+  // 5 Step Progressive Disclosure:
+  // Step 1: Pilih Layanan & Tipe Hunian (Tahap 2, 4)
+  // Step 2: Pilih Ruangan & Durasi (Tahap 5, 6)
+  // Step 3: Pilih Layanan Tambahan (Add-ons) & Paket Rutin (Tahap 7, 21)
+  // Step 4: Pilih Tanggal & Jam dengan Ketersediaan Staff Riil (Tahap 10)
+  // Step 5: Alamat, Catatan, Tinjauan Akhir & Konfirmasi (Tahap 9, 11, 12)
   const [currentStep, setCurrentStep] = useState(1);
 
   // Form states
   const [selectedService, setSelectedService] = useState(selectedServiceId || services[0]?.id || "");
   const [housingType, setHousingType] = useState<HousingType>("rumah");
-  const [roomCount, setRoomCount] = useState("2_rooms");
+  const [selectedRooms, setSelectedRooms] = useState<string[]>([
+    "Ruang tamu",
+    "Kamar tidur",
+    "Kamar mandi",
+  ]);
   const [durationHours, setDurationHours] = useState<number>(2);
   const [selectedAddOnIds, setSelectedAddOnIds] = useState<string[]>([]);
   const [recurring, setRecurring] = useState<RecurringFrequency>("one_time");
 
   const [bookingDate, setBookingDate] = useState("");
   const [startTime, setStartTime] = useState("09:00");
+  const [slotAvailability, setSlotAvailability] = useState<
+    Record<string, { isAvailable: boolean; busyStaff: number }>
+  >({});
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   const [selectedAddressId, setSelectedAddressId] = useState(addresses[0]?.id || "manual");
   const [manualAddress, setManualAddress] = useState(addresses[0]?.full_address || "");
@@ -88,6 +101,14 @@ export function BookingForm({
     });
   }, [activeServiceObj, durationHours, selectedAddOnObjs, recurring]);
 
+  const handleToggleRoom = (roomName: string) => {
+    setSelectedRooms((prev) =>
+      prev.includes(roomName)
+        ? prev.filter((r) => r !== roomName)
+        : [...prev, roomName]
+    );
+  };
+
   const handleToggleAddOn = (id: string) => {
     setSelectedAddOnIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
@@ -110,55 +131,89 @@ export function BookingForm({
     }
   };
 
-  // Step validations
-  const canGoToStep2 = Boolean(selectedService && housingType && roomCount && durationHours);
-  const canGoToStep3 = Boolean(canGoToStep2);
-  const canGoToStep4 = Boolean(canGoToStep3 && bookingDate && startTime);
+  const handleDateChange = async (dateVal: string) => {
+    setBookingDate(dateVal);
+    if (dateVal) {
+      setLoadingSlots(true);
+      try {
+        const res = await checkAvailableSlotsAction(dateVal);
+        setSlotAvailability(res.slots || {});
+        if (res.slots && res.slots[startTime] && !res.slots[startTime].isAvailable) {
+          const firstAvail = standardTimeSlots.find((s) => res.slots[s]?.isAvailable);
+          if (firstAvail) setStartTime(firstAvail);
+        }
+      } catch {
+        // Fallback gracefully
+      } finally {
+        setLoadingSlots(false);
+      }
+    }
+  };
 
+  // Step validations
+  const canGoToStep2 = Boolean(selectedService && housingType);
+  const canGoToStep3 = Boolean(canGoToStep2 && selectedRooms.length > 0 && durationHours);
+  const canGoToStep4 = Boolean(canGoToStep3);
+  const canGoToStep5 = Boolean(canGoToStep4 && bookingDate && startTime);
+
+  // TAHAP 13 — KONFIRMASI BOOKING SUCCESS SCREEN
   if (state.booking) {
+    const bookingCode = `JC-${state.booking.id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+    const startParts = (state.booking.startTime || "09:00").split(":").map(Number);
+    const dur = state.booking.durationHours || 2;
+    const endHour = String((startParts[0] + dur) % 24).padStart(2, "0");
+    const endMinute = String(startParts[1] || 0).padStart(2, "0");
+    const timeFormatted = `${state.booking.startTime}–${endHour}:${endMinute} WIB`;
+
     return (
       <section className="booking-success" aria-live="polite">
         <div className="booking-success-badge">
           <span className="booking-success-icon">✓</span>
-          <p className="customer-overline">Pemesanan Terkirim</p>
+          <p className="customer-overline">Konfirmasi Booking</p>
         </div>
-        <h2>Pesanan Anda Siap Kami Proses</h2>
+        <h2>Booking berhasil!</h2>
         <p className="booking-success-intro">
-          Terima kasih telah mempercayakan kebersihan ruang Anda kepada JoCleanCare. Tim admin kami sedang memeriksa ketersediaan staf untuk mengonfirmasi pesanan Anda.
+          Pesanan Anda telah diterima dalam sistem JoCleanCare dan sedang diproses oleh tim operasional kami.
         </p>
 
         <dl className="booking-success-details">
           <div>
             <dt>Nomor Booking</dt>
-            <dd className="break-all font-mono">#{state.booking.id.slice(0, 8)}</dd>
+            <dd className="font-mono font-bold text-teal-800 text-base">{bookingCode}</dd>
           </div>
           <div>
-            <dt>Layanan Utama</dt>
+            <dt>Layanan</dt>
             <dd className="font-semibold">{state.booking.serviceName}</dd>
           </div>
           <div>
-            <dt>Tanggal Layanan</dt>
+            <dt>Tanggal</dt>
             <dd>{formatBookingDate(state.booking.bookingDate)}</dd>
           </div>
           <div>
-            <dt>Waktu Kunjungan</dt>
-            <dd>{state.booking.startTime} WIB</dd>
+            <dt>Jam</dt>
+            <dd>{timeFormatted}</dd>
+          </div>
+          {state.booking.address && (
+            <div className="fact-full-width">
+              <dt>Alamat</dt>
+              <dd>{state.booking.address}</dd>
+            </div>
+          )}
+          <div>
+            <dt>Total</dt>
+            <dd className="text-teal-800 font-bold text-lg">{formatRupiah(state.booking.totalPrice)}</dd>
           </div>
           <div>
-            <dt>Total Estimasi</dt>
-            <dd className="text-teal-800 font-bold">{formatRupiah(state.booking.totalPrice)}</dd>
-          </div>
-          <div>
-            <dt>Status Awal</dt>
+            <dt>Status</dt>
             <dd className="customer-status customer-status-pending">
-              {bookingStatuses[state.booking.status] ?? state.booking.status}
+              {bookingStatuses[state.booking.status] ?? "Menunggu konfirmasi"}
             </dd>
           </div>
         </dl>
 
         <div className="booking-success-actions">
           <Link href={`/orders/${state.booking.id}`} className="customer-button customer-button-primary">
-            Pantau Progres Pesanan <span aria-hidden="true">→</span>
+            Lihat Pesanan <span aria-hidden="true">→</span>
           </Link>
           <Link href="/dashboard" className="customer-button customer-button-link">
             Kembali ke Dashboard
@@ -174,9 +229,10 @@ export function BookingForm({
       <nav aria-label="Langkah Pemesanan" className="wizard-stepper">
         {[
           { num: 1, title: "Layanan & Hunian" },
-          { num: 2, title: "Layanan Ekstra" },
-          { num: 3, title: "Jadwal Waktu" },
-          { num: 4, title: "Alamat & Review" },
+          { num: 2, title: "Ruangan & Durasi" },
+          { num: 3, title: "Add-ons" },
+          { num: 4, title: "Jadwal & Jam" },
+          { num: 5, title: "Alamat & Konfirmasi" },
         ].map((step) => {
           const isActive = currentStep === step.num;
           const isDone = currentStep > step.num;
@@ -190,6 +246,7 @@ export function BookingForm({
                 if (step.num === 2 && canGoToStep2) setCurrentStep(2);
                 if (step.num === 3 && canGoToStep3) setCurrentStep(3);
                 if (step.num === 4 && canGoToStep4) setCurrentStep(4);
+                if (step.num === 5 && canGoToStep5) setCurrentStep(5);
               }}
             >
               <span className="step-badge">{isDone ? "✓" : step.num}</span>
@@ -207,10 +264,9 @@ export function BookingForm({
             </div>
           )}
 
-          {/* Hidden inputs to send to Server Action */}
+          {/* Hidden inputs sent to Server Action */}
           <input type="hidden" name="service_id" value={selectedService} />
           <input type="hidden" name="housing_type" value={housingType} />
-          <input type="hidden" name="room_count" value={roomCount} />
           <input type="hidden" name="duration_hours" value={durationHours} />
           <input type="hidden" name="recurring_frequency" value={recurring} />
           <input type="hidden" name="booking_date" value={bookingDate} />
@@ -221,15 +277,19 @@ export function BookingForm({
           <input type="hidden" name="notes" value={notes} />
           <input type="hidden" name="preferred_staff_id" value={preferredStaffId} />
           {saveAddress && <input type="hidden" name="save_address" value="on" />}
+          {selectedRooms.map((r) => (
+            <input key={r} type="hidden" name="rooms" value={r} />
+          ))}
+          <input type="hidden" name="room_count" value={selectedRooms.join(", ")} />
           {selectedAddOnIds.map((id) => (
             <input key={id} type="hidden" name="add_ons" value={id} />
           ))}
 
-          {/* STEP 1: Layanan & Karakteristik Hunian */}
+          {/* STEP 1: Pilih Layanan & Tipe Hunian */}
           {currentStep === 1 && (
             <fieldset className="wizard-step-section">
               <legend className="wizard-section-title">
-                <span>Langkah 1 dari 4</span>
+                <span>Langkah 1 dari 5</span>
                 <h2>Pilih Layanan & Tipe Hunian</h2>
               </legend>
 
@@ -258,7 +318,7 @@ export function BookingForm({
                         <p className="service-desc">{service.description || "Layanan kebersihan profesional."}</p>
                         <div className="service-meta-footer">
                           <span className="service-price">{formatRupiah(Number(service.price))}</span>
-                          <span className="service-time">{service.duration_minutes} menit</span>
+                          <span className="service-time">~{service.duration_minutes} menit</span>
                         </div>
                       </div>
                     );
@@ -266,9 +326,9 @@ export function BookingForm({
                 </div>
               </div>
 
-              {/* Housing Type */}
+              {/* Housing Type (Tahap 4 Spec) */}
               <div className="form-group-block">
-                <label className="customer-field-label">Tipe Tempat / Hunian</label>
+                <label className="customer-field-label">Tipe Hunian / Bangunan</label>
                 <div className="chip-selection-grid">
                   {(Object.entries(housingTypes) as [HousingType, { label: string; desc: string }][]).map(
                     ([key, val]) => (
@@ -286,27 +346,62 @@ export function BookingForm({
                 </div>
               </div>
 
-              {/* Room Count */}
+              <div className="wizard-nav-buttons">
+                <button
+                  type="button"
+                  className="customer-button customer-button-primary"
+                  disabled={!canGoToStep2}
+                  onClick={() => setCurrentStep(2)}
+                >
+                  Lanjut ke Pilih Ruangan & Durasi <span aria-hidden="true">→</span>
+                </button>
+              </div>
+            </fieldset>
+          )}
+
+          {/* STEP 2: Pilih Ruangan & Durasi (Tahap 5 & 6 Spec) */}
+          {currentStep === 2 && (
+            <fieldset className="wizard-step-section">
+              <legend className="wizard-section-title">
+                <span>Langkah 2 dari 5</span>
+                <h2>Pilih Ruangan & Durasi Pembersihan</h2>
+              </legend>
+
+              {/* Multi-Select Room Options (Tahap 5 Spec) */}
               <div className="form-group-block">
-                <label className="customer-field-label">Jumlah Kamar / Estimasi Luas</label>
-                <div className="room-options-grid">
-                  {roomOptions.map((r) => (
-                    <button
-                      key={r.value}
-                      type="button"
-                      onClick={() => setRoomCount(r.value)}
-                      className={`chip-button chip-compact ${roomCount === r.value ? "is-selected" : ""}`}
-                    >
-                      <span>{r.label}</span>
-                      <small>{r.estimate}</small>
-                    </button>
-                  ))}
+                <label className="customer-field-label">
+                  Ruang yang Ingin Dibersihkan <small>(Bisa pilih beberapa sekaligus)</small>
+                </label>
+                <div className="rooms-checklist-grid">
+                  {cleaningRoomOptions.map((room) => {
+                    const isChecked = selectedRooms.includes(room.id);
+                    return (
+                      <label
+                        key={room.id}
+                        className={`room-checkbox-card ${isChecked ? "is-checked" : ""}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleRoom(room.id)}
+                          className="room-input-checkbox"
+                        />
+                        <div className="room-checkbox-info">
+                          <strong>{room.label}</strong>
+                          <small>{room.desc}</small>
+                        </div>
+                      </label>
+                    );
+                  })}
                 </div>
+                {selectedRooms.length === 0 && (
+                  <p className="field-hint text-amber-700">Pilih minimal 1 area ruangan yang ingin dibersihkan.</p>
+                )}
               </div>
 
-              {/* Duration */}
+              {/* Duration Options (Tahap 6 Spec) */}
               <div className="form-group-block">
-                <label className="customer-field-label">Pilih Durasi Pengerjaan</label>
+                <label className="customer-field-label">Pilih Durasi Waktu Pembersihan</label>
                 <div className="duration-options-grid">
                   {durationOptions.map((opt) => (
                     <button
@@ -320,30 +415,38 @@ export function BookingForm({
                     </button>
                   ))}
                 </div>
+                <p className="field-hint">Durasi dapat disesuaikan dengan luas dan tingkat kekotoran ruangan.</p>
               </div>
 
               <div className="wizard-nav-buttons">
                 <button
                   type="button"
-                  className="customer-button customer-button-primary"
-                  disabled={!canGoToStep2}
-                  onClick={() => setCurrentStep(2)}
+                  className="customer-button customer-button-link"
+                  onClick={() => setCurrentStep(1)}
                 >
-                  Lanjut ke Layanan Tambahan <span aria-hidden="true">→</span>
+                  <span aria-hidden="true">←</span> Kembali
+                </button>
+                <button
+                  type="button"
+                  className="customer-button customer-button-primary"
+                  disabled={selectedRooms.length === 0}
+                  onClick={() => setCurrentStep(3)}
+                >
+                  Lanjut ke Layanan Tambahan (Add-on) <span aria-hidden="true">→</span>
                 </button>
               </div>
             </fieldset>
           )}
 
-          {/* STEP 2: Add-ons & Recurring Preference */}
-          {currentStep === 2 && (
+          {/* STEP 3: Add-ons & Recurring Preference (Tahap 7 & 21 Spec) */}
+          {currentStep === 3 && (
             <fieldset className="wizard-step-section">
               <legend className="wizard-section-title">
-                <span>Langkah 2 dari 4</span>
+                <span>Langkah 3 dari 5</span>
                 <h2>Pilih Layanan Tambahan (Add-ons)</h2>
               </legend>
               <p className="wizard-intro-copy">
-                Pilih perawatan ekstra yang diinginkan. Anda dapat memilih lebih dari satu add-on.
+                Lengkapi pembersihan dengan pengerjaan khusus. Anda dapat memilih lebih dari satu add-on.
               </p>
 
               {/* Add-ons List */}
@@ -374,11 +477,11 @@ export function BookingForm({
                 })}
               </div>
 
-              {/* Recurring Cleaning Option */}
+              {/* Recurring Option */}
               <div className="form-group-block recurring-block">
                 <label className="customer-field-label">Frekuensi Pembersihan</label>
                 <p className="recurring-sub">
-                  Pilih paket langganan rutin untuk rumah selalu terawat dengan potongan harga khusus.
+                  Dapatkan potongan harga khusus untuk hunian selalu bersih dengan paket langganan rutin.
                 </p>
                 <div className="recurring-grid">
                   {(Object.entries(recurringOptions) as [RecurringFrequency, typeof recurringOptions[RecurringFrequency]][]).map(
@@ -406,26 +509,26 @@ export function BookingForm({
                 <button
                   type="button"
                   className="customer-button customer-button-link"
-                  onClick={() => setCurrentStep(1)}
+                  onClick={() => setCurrentStep(2)}
                 >
                   <span aria-hidden="true">←</span> Kembali
                 </button>
                 <button
                   type="button"
                   className="customer-button customer-button-primary"
-                  onClick={() => setCurrentStep(3)}
+                  onClick={() => setCurrentStep(4)}
                 >
-                  Lanjut ke Pilih Jadwal <span aria-hidden="true">→</span>
+                  Lanjut ke Jadwal & Jam <span aria-hidden="true">→</span>
                 </button>
               </div>
             </fieldset>
           )}
 
-          {/* STEP 3: Jadwal & Waktu */}
-          {currentStep === 3 && (
+          {/* STEP 4: Tanggal & Jam dengan Ketersediaan Staff Riil (Tahap 10 Spec) */}
+          {currentStep === 4 && (
             <fieldset className="wizard-step-section">
               <legend className="wizard-section-title">
-                <span>Langkah 3 dari 4</span>
+                <span>Langkah 4 dari 5</span>
                 <h2>Pilih Tanggal & Jam Kunjungan</h2>
               </legend>
 
@@ -437,33 +540,47 @@ export function BookingForm({
                       type="date"
                       min={today}
                       value={bookingDate}
-                      onChange={(e) => setBookingDate(e.target.value)}
+                      onChange={(e) => handleDateChange(e.target.value)}
                       required
                       className="customer-field"
                     />
                   </label>
-                  <p className="field-hint">Pemesanan dapat dilakukan mulai hari ini atau hari kerja berikutnya.</p>
+                  <p className="field-hint">Pemesanan tersedia mulai hari ini atau hari kerja berikutnya.</p>
                 </div>
 
                 <div className="form-group-block">
-                  <label className="customer-field-label">Pilih Jam Mulai (WIB)</label>
-                  <div className="time-slots-grid">
-                    {standardTimeSlots.map((slot) => (
-                      <button
-                        key={slot}
-                        type="button"
-                        onClick={() => setStartTime(slot)}
-                        className={`time-slot-chip ${startTime === slot ? "is-selected" : ""}`}
-                      >
-                        {slot}
-                      </button>
-                    ))}
+                  <div className="flex items-center justify-between">
+                    <label className="customer-field-label">Pilih Jam Mulai (WIB)</label>
+                    {loadingSlots && <small className="text-teal-700">Memeriksa ketersediaan…</small>}
                   </div>
-                  <p className="field-hint">Jam operasional: 08:00 – 17:00 WIB.</p>
+
+                  <div className="time-slots-grid">
+                    {standardTimeSlots.map((slot) => {
+                      const slotInfo = slotAvailability[slot];
+                      const isAvail = slotInfo ? slotInfo.isAvailable : true;
+                      const isSelected = startTime === slot;
+
+                      return (
+                        <button
+                          key={slot}
+                          type="button"
+                          disabled={!isAvail}
+                          onClick={() => setStartTime(slot)}
+                          className={`time-slot-chip ${isSelected ? "is-selected" : ""} ${!isAvail ? "is-slot-full" : ""}`}
+                        >
+                          <span className="slot-hour">{slot}</span>
+                          <span className={`slot-status-pill ${isAvail ? "is-available" : "is-full"}`}>
+                            {isAvail ? "Tersedia" : "Penuh"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="field-hint">Jam operasional standar: 08:00 – 17:00 WIB.</p>
                 </div>
               </div>
 
-              {/* Preferred cleaner if customer has favorites */}
+              {/* Preferred cleaner if customer has favorites (Tahap 16 & 17 Spec) */}
               {favoriteCleaners.length > 0 && (
                 <div className="form-group-block">
                   <label className="customer-field-label">Pilih Petugas Favorit (Opsional)</label>
@@ -486,7 +603,7 @@ export function BookingForm({
                 <button
                   type="button"
                   className="customer-button customer-button-link"
-                  onClick={() => setCurrentStep(2)}
+                  onClick={() => setCurrentStep(3)}
                 >
                   <span aria-hidden="true">←</span> Kembali
                 </button>
@@ -494,7 +611,7 @@ export function BookingForm({
                   type="button"
                   className="customer-button customer-button-primary"
                   disabled={!bookingDate || !startTime}
-                  onClick={() => setCurrentStep(4)}
+                  onClick={() => setCurrentStep(5)}
                 >
                   Lanjut ke Alamat & Review <span aria-hidden="true">→</span>
                 </button>
@@ -502,15 +619,15 @@ export function BookingForm({
             </fieldset>
           )}
 
-          {/* STEP 4: Alamat, Catatan, Review & Konfirmasi */}
-          {currentStep === 4 && (
+          {/* STEP 5: Alamat, Catatan Petugas & Tinjauan Akhir (Tahap 9, 11, 12 Spec) */}
+          {currentStep === 5 && (
             <fieldset className="wizard-step-section">
               <legend className="wizard-section-title">
-                <span>Langkah 4 dari 4</span>
-                <h2>Alamat Layanan & Konfirmasi</h2>
+                <span>Langkah 5 dari 5</span>
+                <h2>Alamat Layanan, Catatan & Konfirmasi</h2>
               </legend>
 
-              {/* Saved addresses picker */}
+              {/* Saved addresses picker (Tahap 9 Spec) */}
               {addresses.length > 0 && (
                 <div className="form-group-block">
                   <label className="customer-field-label">Pilih Alamat Tersimpan</label>
@@ -570,7 +687,7 @@ export function BookingForm({
                   <textarea
                     value={manualAddress}
                     onChange={(e) => setManualAddress(e.target.value)}
-                    placeholder="Nama jalan, nomor rumah/unit, RT/RW, kecamatan, kota, patokan lokasi"
+                    placeholder="Nama jalan, nomor rumah/unit, RT/RW, kelurahan, kecamatan, kota, patokan lokasi"
                     minLength={8}
                     maxLength={500}
                     className="customer-field customer-textarea"
@@ -578,12 +695,13 @@ export function BookingForm({
                   />
                 </label>
 
+                {/* Catatan untuk cleaner (Tahap 11 Spec) */}
                 <label className="customer-field-label full-width">
-                  Instruksi Khusus untuk Petugas <span className="field-optional">Opsional</span>
+                  Catatan untuk Petugas <span className="field-optional">Opsional (Maks. 1.000 karakter)</span>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Contoh: Gunakan cairan pembersih non-aroma, masuk lewat pintu belakang samping garasi, ada hewan peliharaan di dalam kandang"
+                    placeholder="Contoh: Masuk melalui pintu samping garasi. Ada hewan peliharaan di rumah. Hubungi saya sebelum datang."
                     maxLength={1000}
                     className="customer-field customer-textarea customer-notes"
                   />
@@ -601,34 +719,52 @@ export function BookingForm({
                 )}
               </div>
 
-              {/* Review Order Summary Box before Submit */}
+              {/* Review Pesanan (Tahap 12 Spec) */}
               <div className="order-final-review-card">
-                <h3>Tinjauan Akhir Pesanan</h3>
+                <h3>Tinjauan Lengkap Pesanan</h3>
                 <dl className="review-list">
                   <div>
-                    <dt>Paket Layanan</dt>
-                    <dd>{activeServiceObj?.name} ({housingTypes[housingType]?.label})</dd>
+                    <dt>Layanan</dt>
+                    <dd>{activeServiceObj?.name}</dd>
                   </div>
                   <div>
-                    <dt>Durasi & Ruangan</dt>
-                    <dd>{durationHours} Jam · {roomOptions.find((r) => r.value === roomCount)?.label}</dd>
+                    <dt>Tipe Hunian</dt>
+                    <dd>{housingTypes[housingType]?.label}</dd>
                   </div>
                   <div>
-                    <dt>Layanan Tambahan</dt>
+                    <dt>Ruangan yang Dibersihkan</dt>
+                    <dd>{selectedRooms.length > 0 ? selectedRooms.join(", ") : "Belum dipilih"}</dd>
+                  </div>
+                  <div>
+                    <dt>Durasi</dt>
+                    <dd>{durationHours} Jam</dd>
+                  </div>
+                  <div>
+                    <dt>Layanan Tambahan (Add-on)</dt>
                     <dd>
                       {selectedAddOnObjs.length > 0
-                        ? selectedAddOnObjs.map((a) => a.name).join(", ")
+                        ? selectedAddOnObjs.map((a) => `${a.name} (+${formatRupiah(Number(a.price))})`).join(", ")
                         : "Tidak ada"}
                     </dd>
                   </div>
                   <div>
-                    <dt>Jadwal Kedatangan</dt>
-                    <dd>{bookingDate ? formatBookingDate(bookingDate) : "-"} pukul {startTime} WIB</dd>
+                    <dt>Alamat Layanan</dt>
+                    <dd>{manualAddress || "-"}</dd>
                   </div>
                   <div>
-                    <dt>Frekuensi</dt>
-                    <dd>{recurringOptions[recurring]?.label}</dd>
+                    <dt>Tanggal</dt>
+                    <dd>{bookingDate ? formatBookingDate(bookingDate) : "-"}</dd>
                   </div>
+                  <div>
+                    <dt>Jam</dt>
+                    <dd>{startTime} WIB</dd>
+                  </div>
+                  {notes && (
+                    <div className="fact-full-width">
+                      <dt>Catatan Petugas</dt>
+                      <dd>&ldquo;{notes}&rdquo;</dd>
+                    </div>
+                  )}
                 </dl>
               </div>
 
@@ -636,7 +772,7 @@ export function BookingForm({
                 <button
                   type="button"
                   className="customer-button customer-button-link"
-                  onClick={() => setCurrentStep(3)}
+                  onClick={() => setCurrentStep(4)}
                 >
                   <span aria-hidden="true">←</span> Kembali
                 </button>
@@ -645,14 +781,14 @@ export function BookingForm({
                   disabled={pending || !manualAddress || manualAddress.length < 8}
                   className="customer-button customer-button-primary booking-submit-btn"
                 >
-                  {pending ? "Memproses Pemesanan…" : "Konfirmasi & Buat Pesanan"}
+                  {pending ? "Memproses Pemesanan…" : "Konfirmasi Booking"}
                 </button>
               </div>
             </fieldset>
           )}
         </div>
 
-        {/* Sticky Price Breakdown Aside (Section 19: Price Estimation) */}
+        {/* Sticky Price Breakdown Aside (Tahap 8: Perhitungan Harga Aman) */}
         <aside className="booking-summary" aria-label="Rincian Biaya Pemesanan">
           <p className="customer-overline">Rincian Biaya</p>
           <div className="summary-service-title">{activeServiceObj?.name}</div>
@@ -694,7 +830,7 @@ export function BookingForm({
           <div className="summary-trust-points">
             <div>
               <span className="trust-check">✓</span>
-              <small>Harga transparan server-side tanpa biaya tersembunyi</small>
+              <small>Harga transparan server-side tanpa biaya siluman</small>
             </div>
             <div>
               <span className="trust-check">✓</span>

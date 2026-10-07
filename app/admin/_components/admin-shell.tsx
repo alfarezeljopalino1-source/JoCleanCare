@@ -6,13 +6,18 @@ import { logoutAction } from "../../actions/auth";
 import type { UserRole } from "../../../lib/auth/roles";
 
 const links = [
-  ["/admin", "Ringkasan"],
-  ["/admin/orders", "Pesanan"],
-  ["/admin/services", "Layanan & Add-on"],
-  ["/admin/staff", "Petugas"],
-  ["/admin/schedules", "Jadwal"],
-  ["/admin/customers", "Pelanggan"],
+  ["/admin", "Dashboard"],
+  ["/admin/orders", "Booking"],
+  ["/admin/schedules", "Kalender"],
+  ["/admin/services", "Layanan"],
+  ["/admin/addons", "Add-on"],
+  ["/admin/staff", "Staff"],
+  ["/admin/customers", "Customer"],
+  ["/admin/chat", "Chat"],
+  ["/admin/reviews", "Review"],
   ["/admin/notifications", "Notifikasi"],
+  ["/admin/reports", "Laporan"],
+  ["/admin/settings", "Pengaturan"],
 ] as const;
 
 export function AdminShell({ children, name }: { children: React.ReactNode; name: string }) {

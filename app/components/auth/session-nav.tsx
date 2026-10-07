@@ -10,9 +10,24 @@ export function SessionNav({ profile }: { profile: { name: string; role: UserRol
   const pathname = usePathname();
   const profileUrl = profile.role === "customer" ? "/profile" : profile.role === "staff" ? "/staff/profile" : null;
   const links = [
-    { href: dashboardForRole(profile.role), label: "Dashboard" },
-    ...(profile.role === "customer" ? [{ href: "/layanan", label: "Layanan" }, { href: "/paket", label: "Paket Rutin" }, { href: "/orders", label: "Pesanan" }] : []),
-    ...(profile.role === "staff" ? [{ href: "/staff/schedules", label: "Jadwal" }] : []),
+    {
+      href: dashboardForRole(profile.role),
+      label: profile.role === "staff" ? "Beranda" : "Dashboard",
+    },
+    ...(profile.role === "customer"
+      ? [
+          { href: "/layanan", label: "Layanan" },
+          { href: "/paket", label: "Paket Rutin" },
+          { href: "/orders", label: "Pesanan" },
+        ]
+      : []),
+    ...(profile.role === "staff"
+      ? [
+          { href: "/staff/schedules", label: "Jadwal" },
+          { href: "/staff/tasks", label: "Tugas" },
+          { href: "/staff/messages", label: "Pesan" },
+        ]
+      : []),
     ...(profileUrl ? [{ href: profileUrl, label: "Profil" }] : []),
   ];
   const initials = profile.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "JC";
