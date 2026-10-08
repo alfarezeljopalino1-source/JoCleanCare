@@ -19,6 +19,7 @@ export function SessionNav({ profile }: { profile: { name: string; role: UserRol
           { href: "/layanan", label: "Layanan" },
           { href: "/paket", label: "Paket Rutin" },
           { href: "/orders", label: "Pesanan" },
+          { href: "/chat", label: "Chat" },
         ]
       : []),
     ...(profile.role === "staff"
@@ -31,7 +32,10 @@ export function SessionNav({ profile }: { profile: { name: string; role: UserRol
     ...(profileUrl ? [{ href: profileUrl, label: "Profil" }] : []),
   ];
   const initials = profile.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "JC";
-  const isCurrent = (href: string) => pathname === href || (href === "/orders" && pathname.startsWith("/orders/"));
+  const isCurrent = (href: string) =>
+    pathname === href ||
+    (href === "/orders" && pathname.startsWith("/orders/")) ||
+    (href === "/chat" && pathname.startsWith("/chat"));
   return <header className="customer-nav-shell"><div className="customer-nav-inner">
     <Link href="/" className="customer-brand" aria-label="JoCleanCare, beranda"><span className="brand-mark" aria-hidden="true"><span /><span /><span /></span><span>JoClean<span>Care</span></span></Link>
     <nav aria-label="Navigasi akun" className={`customer-account-nav${profile.role === "customer" ? " customer-account-nav-customer" : ""}`}>{links.map(({ href, label }) => <Link key={href} href={href} aria-current={isCurrent(href) ? "page" : undefined} className={isCurrent(href) ? "is-current" : undefined}>{label}</Link>)}</nav>

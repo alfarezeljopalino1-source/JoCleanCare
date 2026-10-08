@@ -38,6 +38,9 @@ export async function Header() {
                   <Link href="/orders" className="site-customer-link">
                     Pesanan
                   </Link>
+                  <Link href="/chat" className="site-customer-link">
+                    Chat
+                  </Link>
                 </>
               )}
               <Link href={dashboardForRole(current.profile.role)} className="site-account-link">

@@ -13,10 +13,11 @@ import { requireRole } from "../../../lib/auth/session";
 import {
   cancelBookingAction,
   rescheduleBookingAction,
-  sendBookingMessageAction,
   submitReviewAction,
   toggleFavoriteCleanerAction,
 } from "../../actions/bookings";
+import { getOrCreateStaffRoom, getRoomMessages } from "../../../lib/chat";
+import { ChatBox } from "../../chat/chat-box";
 
 export const dynamic = "force-dynamic";
 
@@ -80,18 +81,11 @@ export default async function OrderDetailPage({
     .eq("booking_id", booking.id)
     .maybeSingle();
 
-  // 4. Fetch booking messages (chat)
-  const { data: chatMessages } = await supabase
-    .from("booking_messages")
-    .select(`
-      id,
-      message,
-      created_at,
-      sender_id,
-      sender:profiles!booking_messages_sender_id_fkey (name, role)
-    `)
-    .eq("booking_id", booking.id)
-    .order("created_at", { ascending: true });
+  // 4. Fetch staff chat room if cleaner assigned
+  const staffRoomId = assignedCleaner?.staff_id
+    ? await getOrCreateStaffRoom(supabase, booking.id)
+    : null;
+  const staffMessages = staffRoomId ? await getRoomMessages(supabase, staffRoomId) : [];
 
   // 5. Check if cleaner is favorited
   let isCleanerFavorite = false;
@@ -302,53 +296,50 @@ export default async function OrderDetailPage({
         {/* BOOKING CHAT (Section 17) */}
         {!isCancelled && (
           <section id="chat-section" className="order-chat-section">
-            <div className="chat-section-header">
-              <h2>Pesan & Komunikasi Booking</h2>
-              <p>Kirim pesan langsung ke petugas atau admin terkait kunjungan ini.</p>
+            <div className="chat-section-header flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div>
+                <h2>Pesan & Komunikasi Booking</h2>
+                <p>
+                  {assignedCleaner
+                    ? `Chat langsung dengan petugas ${assignedCleaner.staff_name} mengenai kunjungan ini.`
+                    : "Koordinasi chat khusus petugas akan aktif otomatis setelah staf ditugaskan."}
+                </p>
+              </div>
+              <Link href="/chat" className="text-xs font-semibold text-teal-700 hover:underline">
+                Chat Admin JoCleanCare →
+              </Link>
             </div>
 
-            <div className="chat-messages-container">
-              {chatMessages && chatMessages.length > 0 ? (
-                chatMessages.map((msg) => {
-                  const isMe = msg.sender_id === user.id;
-                  const senderName = (msg.sender as unknown as { name: string; role: string } | null)?.name || "Pengguna";
-                  const senderRole = (msg.sender as unknown as { name: string; role: string } | null)?.role || "customer";
-                  return (
-                    <div key={msg.id} className={`chat-bubble-row ${isMe ? "is-mine" : "is-theirs"}`}>
-                      <div className="chat-bubble">
-                        <div className="chat-bubble-author">
-                          <strong>{isMe ? "Anda" : senderName}</strong>
-                          <span className="role-tag">{senderRole === "staff" ? "Petugas" : senderRole === "admin" ? "Admin" : "Pelanggan"}</span>
-                        </div>
-                        <p>{msg.message}</p>
-                        <small className="chat-time">
-                          {new Date(msg.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
-                        </small>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="chat-empty">
-                  <p>Belum ada pesan. Anda dapat memberi petunjuk tambahan atau menanyakan kedatangan di sini.</p>
-                </div>
-              )}
-            </div>
-
-            <form action={sendBookingMessageAction} className="chat-input-form">
-              <input type="hidden" name="booking_id" value={booking.id} />
-              <input
-                type="text"
-                name="message"
-                required
-                maxLength={1000}
-                placeholder="Tulis pesan untuk petugas atau admin..."
-                className="customer-field chat-field"
-              />
-              <button type="submit" className="customer-button customer-button-primary chat-send-btn">
-                Kirim
-              </button>
-            </form>
+            {assignedCleaner && staffRoomId ? (
+              <div className="h-[28rem] rounded-xl overflow-hidden border border-gray-200">
+                <ChatBox
+                  roomId={staffRoomId}
+                  initialMessages={staffMessages}
+                  currentUserId={user.id}
+                  partnerName={assignedCleaner.staff_name}
+                  partnerRoleTitle="Petugas Kebersihan"
+                  partnerSubtitle={`Koordinasi langsung untuk ${service?.name || "Layanan"}`}
+                  bookingCode={bookingCode}
+                  returnUrl={`/orders/${booking.id}#chat-section`}
+                />
+              </div>
+            ) : (
+              <div className="p-6 bg-slate-50 border border-dashed border-gray-300 rounded-xl text-center">
+                <span className="text-3xl block mb-2">🧹</span>
+                <p className="text-sm font-semibold text-gray-800">
+                  Petugas Belum Ditugaskan
+                </p>
+                <p className="text-xs text-gray-500 max-w-md mx-auto mt-1 mb-4">
+                  Chat khusus petugas akan otomatis tersedia di sini dan di menu Chat setelah Admin JoCleanCare menetapkan petugas kebersihan untuk pesanan Anda.
+                </p>
+                <Link
+                  href="/chat"
+                  className="customer-button customer-button-secondary text-xs inline-flex"
+                >
+                  Hubungi Admin JoCleanCare →
+                </Link>
+              </div>
+            )}
           </section>
         )}
 

@@ -9,6 +9,7 @@ import {
   getUnreadNotificationsCount,
 } from "../../lib/bookings";
 import { requireRole } from "../../lib/auth/session";
+import { getCustomerUnreadCounts } from "../../lib/chat";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ export default async function CustomerDashboard() {
   const { supabase, user, profile } = await requireRole(["customer"]);
   const columns = "id, booking_date, start_time, total_price, status, services(name)";
 
-  const [activeResult, completedResult, nextBookingResult, latestResult, servicesResult, unreadCount] =
+  const [activeResult, completedResult, nextBookingResult, latestResult, servicesResult, unreadCount, chatUnread] =
     await Promise.all([
       supabase
         .from("bookings")
@@ -46,6 +47,7 @@ export default async function CustomerDashboard() {
         .limit(3),
       getActiveServices(supabase),
       getUnreadNotificationsCount(supabase, user.id),
+      getCustomerUnreadCounts(supabase, user.id),
     ]);
 
   const bookings = (latestResult.data ?? []) as unknown as Array<{
@@ -78,14 +80,41 @@ export default async function CustomerDashboard() {
     }
   }
 
+  const hasChatUnread = (chatUnread.adminUnread + chatUnread.staffUnread) > 0;
+
   return (
     <main className="customer-page customer-dashboard-page">
       <div className="customer-container">
+        {/* Unread chat alert banner if any */}
+        {hasChatUnread && (
+          <div className="mb-3 flex items-center justify-between rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900 shadow-xs">
+            <span className="flex items-center gap-2">
+              <span className="text-base">💬</span>
+              <span>
+                Pesan baru:{" "}
+                {chatUnread.adminUnread > 0 && (
+                  <strong className="mr-2">
+                    {chatUnread.adminUnread} dari Admin JoCleanCare
+                  </strong>
+                )}
+                {chatUnread.staffUnread > 0 && (
+                  <strong>
+                    {chatUnread.staffUnread} dari Petugas
+                  </strong>
+                )}
+              </span>
+            </span>
+            <Link href="/chat" className="font-semibold text-teal-800 underline">
+              Buka Chat →
+            </Link>
+          </div>
+        )}
+
         {/* Unread notification alert banner if any */}
         {unreadCount > 0 && (
-          <div className="mb-4 flex items-center justify-between rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
+          <div className="mb-4 flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
             <span>
-              🔔 Anda memiliki <strong>{unreadCount}</strong> pemberitahuan baru terkait jadwal atau pesanan Anda.
+              🔔 Anda memiliki <strong>{unreadCount}</strong> pemberitahuan sistem baru.
             </span>
             <Link href="/profile" className="font-semibold text-teal-800 underline">
               Buka Notifikasi →
@@ -107,6 +136,14 @@ export default async function CustomerDashboard() {
             </Link>
             <Link href="/orders" className="customer-button customer-button-secondary">
               Lihat Pesanan
+            </Link>
+            <Link href="/chat" className="customer-button customer-button-secondary relative">
+              Chat & Bantuan
+              {hasChatUnread && (
+                <span className="ml-1.5 rounded-full bg-teal-600 px-1.5 py-0.2 text-[10px] text-white font-bold">
+                  {chatUnread.adminUnread + chatUnread.staffUnread}
+                </span>
+              )}
             </Link>
             <Link href="/profile" className="customer-button customer-button-secondary">
               Alamat Saya
