@@ -34,6 +34,22 @@ type RoomListItem = {
   lastMessage: ChatMessage | null;
 };
 
+function formatRoomDate(value?: string | null): string {
+  if (!value || typeof value !== "string" || !value.trim()) return "—";
+  const date = new Date(value.trim());
+  if (Number.isNaN(date.getTime())) return "—";
+  try {
+    return date.toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "—";
+  }
+}
+
 export default async function AdminChatPage({ searchParams }: { searchParams: SearchParams }) {
   const [{ supabase, user }, params] = await Promise.all([
     requireRole(["admin"]),
@@ -147,9 +163,9 @@ export default async function AdminChatPage({ searchParams }: { searchParams: Se
   const partnerSubtitle =
     selectedRoom?.room_type === "admin"
       ? `Email: ${selectedRoom.customer?.email || "-"} · No. Telp: ${selectedRoom.customer?.phone || "-"}`
-      : `Booking #${selectedRoom?.booking?.id.slice(0, 8).toUpperCase()} · ${
+      : `Booking #${selectedRoom?.booking?.id ? selectedRoom.booking.id.slice(0, 8).toUpperCase() : "-"} · ${
           selectedRoom?.booking?.service?.name || "Layanan"
-        } (${formatDate(selectedRoom?.booking?.booking_date ?? "")})`;
+        } (${formatDate(selectedRoom?.booking?.booking_date, "Tanggal tidak tersedia")})`;
 
   const bookingCode = selectedRoom?.booking?.id
     ? `JC-${selectedRoom.booking.id.replace(/-/g, "").slice(0, 8).toUpperCase()}`
@@ -243,7 +259,7 @@ export default async function AdminChatPage({ searchParams }: { searchParams: Se
                         <span className="text-[11px] text-gray-500 block truncate">
                           {room.room_type === "admin"
                             ? room.customer?.phone || room.customer?.email || "Pertanyaan Layanan"
-                            : `Petugas: ${room.staff?.name || "-"} · #${room.booking?.id.slice(0, 8)}`}
+                            : `Petugas: ${room.staff?.name || "-"} · #${room.booking?.id ? room.booking.id.slice(0, 8) : "-"}`}
                         </span>
                       </div>
                       {room.unreadCount > 0 && (
@@ -269,12 +285,7 @@ export default async function AdminChatPage({ searchParams }: { searchParams: Se
                     )}
 
                     <div className="mt-1 text-[10px] text-gray-400 text-right">
-                      {new Date(room.updated_at).toLocaleDateString("id-ID", {
-                        day: "numeric",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatRoomDate(room.updated_at)}
                     </div>
                   </Link>
                 );

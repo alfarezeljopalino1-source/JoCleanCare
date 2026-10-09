@@ -161,11 +161,24 @@ export function formatRupiah(value: number) {
   }).format(value);
 }
 
-export function formatBookingDate(value: string) {
-  return new Intl.DateTimeFormat("id-ID", {
-    dateStyle: "long",
-    timeZone: "UTC",
-  }).format(new Date(`${value}T00:00:00Z`));
+export function formatBookingDate(value?: string | null, fallback = "—"): string {
+  if (!value || typeof value !== "string" || !value.trim()) return fallback;
+  const trimmed = value.trim();
+  let date: Date;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    date = new Date(`${trimmed}T00:00:00Z`);
+  } else {
+    date = new Date(trimmed);
+  }
+  if (Number.isNaN(date.getTime())) return fallback;
+  try {
+    return new Intl.DateTimeFormat("id-ID", {
+      dateStyle: "long",
+      timeZone: "UTC",
+    }).format(date);
+  } catch {
+    return fallback;
+  }
 }
 
 export function jakartaToday() {

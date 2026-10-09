@@ -9,10 +9,11 @@ import { dashboardForRole, type UserRole } from "../../../lib/auth/roles";
 export function SessionNav({ profile }: { profile: { name: string; role: UserRole } }) {
   const pathname = usePathname();
   const profileUrl = profile.role === "customer" ? "/profile" : profile.role === "staff" ? "/staff/profile" : null;
+  const homeHref = dashboardForRole(profile.role);
   const links = [
     {
-      href: dashboardForRole(profile.role),
-      label: profile.role === "staff" ? "Beranda" : "Dashboard",
+      href: homeHref,
+      label: "Beranda",
     },
     ...(profile.role === "customer"
       ? [
@@ -37,7 +38,7 @@ export function SessionNav({ profile }: { profile: { name: string; role: UserRol
     (href === "/orders" && pathname.startsWith("/orders/")) ||
     (href === "/chat" && pathname.startsWith("/chat"));
   return <header className="customer-nav-shell"><div className="customer-nav-inner">
-    <Link href="/" className="customer-brand" aria-label="JoCleanCare, beranda"><span className="brand-mark" aria-hidden="true"><span /><span /><span /></span><span>JoClean<span>Care</span></span></Link>
+    <Link href={homeHref} className="customer-brand" aria-label="JoCleanCare, beranda"><span className="brand-mark" aria-hidden="true"><span /><span /><span /></span><span>JoClean<span>Care</span></span></Link>
     <nav aria-label="Navigasi akun" className={`customer-account-nav${profile.role === "customer" ? " customer-account-nav-customer" : ""}`}>{links.map(({ href, label }) => <Link key={href} href={href} aria-current={isCurrent(href) ? "page" : undefined} className={isCurrent(href) ? "is-current" : undefined}>{label}</Link>)}</nav>
     <details className="customer-profile-menu">
       <summary aria-label={`Menu akun ${profile.name}`}>

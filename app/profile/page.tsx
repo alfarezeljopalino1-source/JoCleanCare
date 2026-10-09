@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireRole } from "../../lib/auth/session";
 import {
   getCustomerAddresses,
@@ -48,6 +49,9 @@ export default async function ProfilePage() {
   return (
     <main className="customer-page profile-page">
       <div className="customer-container customer-narrow">
+        <Link href="/dashboard" className="customer-back-link">
+          <span aria-hidden="true">←</span> Kembali ke Dashboard
+        </Link>
         <header className="customer-page-heading">
           <p className="customer-overline">Pengaturan Akun</p>
           <h1>Profil & Preferensi</h1>
@@ -113,7 +117,7 @@ export default async function ProfilePage() {
             <summary className="customer-inline-link font-semibold cursor-pointer py-2">
               + Tambah Alamat Baru
             </summary>
-            <form action={saveCustomerAddressAction} className="new-address-form">
+            <form action={saveCustomerAddressAction} noValidate className="new-address-form">
               <div className="booking-fields-grid">
                 <label className="customer-field-label">
                   Label Alamat

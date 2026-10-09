@@ -55,7 +55,7 @@ export default async function AdminServicesPage({ searchParams }: { searchParams
               <p className="admin-eyebrow">Tambah Paket</p>
               <h2>Layanan Baru</h2>
             </div>
-            <form action={saveServiceAction} className="admin-service-form">
+            <form action={saveServiceAction} noValidate className="admin-service-form">
               <label>
                 Nama Layanan
                 <input name="name" required minLength={2} maxLength={120} placeholder="Contoh: Deep Cleaning" />
@@ -137,7 +137,7 @@ export default async function AdminServicesPage({ searchParams }: { searchParams
                       </form>
                     </div>
 
-                    <form action={saveServiceAction} className="admin-service-form admin-service-edit">
+                    <form action={saveServiceAction} noValidate className="admin-service-form admin-service-edit">
                       <input type="hidden" name="id" value={service.id} />
                       <label>
                         Nama
@@ -208,7 +208,7 @@ export default async function AdminServicesPage({ searchParams }: { searchParams
               <p className="admin-eyebrow">Tambah Add-on</p>
               <h2>Layanan Tambahan Baru</h2>
             </div>
-            <form action={saveAddOnAction} className="admin-service-form">
+            <form action={saveAddOnAction} noValidate className="admin-service-form">
               <label>
                 Nama Add-on
                 <input name="name" required minLength={2} maxLength={120} placeholder="Contoh: Pembersihan Kulkas" />
@@ -268,7 +268,7 @@ export default async function AdminServicesPage({ searchParams }: { searchParams
                       </form>
                     </div>
 
-                    <form action={saveAddOnAction} className="admin-service-form admin-service-edit">
+                    <form action={saveAddOnAction} noValidate className="admin-service-form admin-service-edit">
                       <input type="hidden" name="id" value={addon.id} />
                       <label>
                         Nama Add-on

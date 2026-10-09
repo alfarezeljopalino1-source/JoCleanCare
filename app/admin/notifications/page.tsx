@@ -89,7 +89,7 @@ export default async function AdminNotificationsPage() {
           <p className="admin-eyebrow">Kirim Notifikasi</p>
           <h2>Kirim Pesan Notifikasi In-App</h2>
         </div>
-        <form action={sendNotificationAction} className="admin-service-form">
+        <form action={sendNotificationAction} noValidate className="admin-service-form">
           <label>
             Penerima
             <select name="user_id" required defaultValue="all">

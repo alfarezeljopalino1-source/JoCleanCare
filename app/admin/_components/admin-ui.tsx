@@ -29,8 +29,58 @@ export function formatMoney(value: number | string | null) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(Number(value ?? 0));
 }
 
-export function formatDate(value: string) {
-  return new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${value}T00:00:00Z`));
+export function formatDate(value?: string | null, fallback = "—"): string {
+  if (!value || typeof value !== "string" || !value.trim()) {
+    return fallback;
+  }
+
+  const trimmed = value.trim();
+  let date: Date;
+
+  // Format date-only 'YYYY-MM-DD'
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    date = new Date(`${trimmed}T00:00:00Z`);
+  } else {
+    date = new Date(trimmed);
+  }
+
+  if (Number.isNaN(date.getTime())) {
+    return fallback;
+  }
+
+  try {
+    return new Intl.DateTimeFormat("id-ID", {
+      dateStyle: "medium",
+      timeZone: "UTC",
+    }).format(date);
+  } catch {
+    return fallback;
+  }
 }
 
-export function formatTime(value: string) { return value.slice(0, 5); }
+export function formatTime(value?: string | null, fallback = "—"): string {
+  if (!value || typeof value !== "string" || !value.trim()) {
+    return fallback;
+  }
+
+  const trimmed = value.trim();
+  if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+    return trimmed.slice(0, 5);
+  }
+
+  const date = new Date(trimmed);
+  if (!Number.isNaN(date.getTime())) {
+    try {
+      return date.toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone: "Asia/Jakarta",
+      });
+    } catch {
+      return fallback;
+    }
+  }
+
+  return fallback;
+}

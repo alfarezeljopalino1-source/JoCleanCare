@@ -108,7 +108,7 @@ export default async function AdminStaffPage({
             Masukkan email pengguna yang sudah terdaftar untuk menetapkan perannya sebagai petugas lapangan JoCleanCare.
           </p>
         </div>
-        <form action={saveStaffAction} className="admin-service-form">
+        <form action={saveStaffAction} noValidate className="admin-service-form">
           <label>
             Email Pengguna Terdaftar
             <input

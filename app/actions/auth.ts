@@ -43,9 +43,9 @@ export async function registerAction(_state: AuthFormState, formData: FormData):
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
   if (!name || !email || !password || !confirmPassword) return { error: "Nama, email, dan password wajib diisi." };
-  if (!validEmail(email)) return { error: "Format email belum benar." };
+  if (!validEmail(email)) return { error: "Masukkan alamat email yang valid." };
   if (password.length < 8) return { error: "Password harus memiliki minimal 8 karakter." };
-  if (password !== confirmPassword) return { error: "Konfirmasi password belum sama." };
+  if (password !== confirmPassword) return { error: "Konfirmasi password tidak cocok." };
 
   try {
     const supabase = await createClient();
@@ -54,7 +54,13 @@ export async function registerAction(_state: AuthFormState, formData: FormData):
       password,
       options: { data: { name, phone } },
     });
-    if (error) return { error: error.message };
+    if (error) {
+      const msg = error.message.toLowerCase();
+      if (msg.includes("already registered") || msg.includes("already in use") || msg.includes("user already exists")) {
+        return { error: "Alamat email ini sudah terdaftar. Silakan login atau gunakan email lain." };
+      }
+      return { error: authErrorMessage(error) };
+    }
 
     if (data.session) redirect("/dashboard");
     return { success: "Pendaftaran berhasil. Periksa email Anda untuk mengonfirmasi akun sebelum login." };
@@ -68,7 +74,7 @@ export async function loginAction(_state: AuthFormState, formData: FormData): Pr
   const email = getField(formData, "email").toLowerCase();
   const password = String(formData.get("password") ?? "");
   if (!email || !password) return { error: "Email dan password wajib diisi." };
-  if (!validEmail(email)) return { error: "Format email belum benar." };
+  if (!validEmail(email)) return { error: "Masukkan alamat email yang valid." };
 
   try {
     const supabase = await createClient();

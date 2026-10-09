@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { dashboardForRole } from "../../lib/auth/roles";
 import { getSignedInProfile } from "../../lib/auth/session";
 import {
   bookingStatuses,
@@ -93,8 +94,9 @@ export default async function SubscriptionPackagesPage() {
     services: { name: string } | { name: string }[] | null;
   }> = [];
 
+  let signedIn = null;
   try {
-    const signedIn = await getSignedInProfile();
+    signedIn = await getSignedInProfile();
     if (signedIn && signedIn.profile.role === "customer") {
       const supabase = await createClient();
       const { data } = await supabase
@@ -122,12 +124,18 @@ export default async function SubscriptionPackagesPage() {
     // If not signed in, proceed to show public packages
   }
 
+  const homeHref = signedIn ? dashboardForRole(signedIn.profile.role) : "/";
+
   return (
     <main className="customer-page packages-page">
       <div className="customer-container">
-        <div className="customer-breadcrumb mb-2">
-          <Link href="/layanan" className="customer-back-link">
-            <span aria-hidden="true">←</span> Kembali ke katalog layanan
+        <div className="customer-breadcrumb mb-2 flex flex-wrap items-center gap-2">
+          <Link href={homeHref} className="customer-back-link">
+            <span aria-hidden="true">←</span> Beranda
+          </Link>
+          <span className="text-gray-300" aria-hidden="true">/</span>
+          <Link href="/layanan" className="customer-inline-link">
+            Katalog Layanan
           </Link>
         </div>
 

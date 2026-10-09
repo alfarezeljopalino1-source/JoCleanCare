@@ -159,7 +159,7 @@ export default async function AdminSchedulesPage({ searchParams }: { searchParam
         {bookingError || staffError ? (
           <Feedback error="Pilihan booking atau petugas belum dapat dimuat." />
         ) : bookingRows.length && staffData?.length ? (
-          <form action={assignStaffAction} className="admin-service-form admin-schedule-form">
+          <form action={assignStaffAction} noValidate className="admin-service-form admin-schedule-form">
             <label className="admin-span-all">
               Pilih Booking yang Siap Ditugaskan
               <select name="booking_id" required defaultValue="">

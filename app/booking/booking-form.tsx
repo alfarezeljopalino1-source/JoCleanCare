@@ -81,6 +81,7 @@ export function BookingForm({
   const [notes, setNotes] = useState("");
   const [saveAddress, setSaveAddress] = useState(false);
   const [preferredStaffId, setPreferredStaffId] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const activeServiceObj = useMemo(
     () => services.find((s) => s.id === selectedService) || services[0],
@@ -133,6 +134,7 @@ export function BookingForm({
 
   const handleDateChange = async (dateVal: string) => {
     setBookingDate(dateVal);
+    setFieldErrors((prev) => ({ ...prev, bookingDate: "" }));
     if (dateVal) {
       setLoadingSlots(true);
       try {
@@ -147,6 +149,49 @@ export function BookingForm({
       } finally {
         setLoadingSlots(false);
       }
+    }
+  };
+
+  const validateStep4 = () => {
+    const errors: Record<string, string> = {};
+    if (!bookingDate) {
+      errors.bookingDate = "Pilih tanggal pembersihan terlebih dahulu.";
+    }
+    if (!startTime) {
+      errors.startTime = "Pilih jam mulai kunjungan terlebih dahulu.";
+    }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleStep4Next = () => {
+    if (validateStep4()) {
+      setCurrentStep(5);
+    }
+  };
+
+  const validateStep5 = () => {
+    const errors: Record<string, string> = {};
+    if (!addressLabel.trim()) {
+      errors.addressLabel = "Label alamat wajib diisi (misal: Rumah, Apartemen, Kantor).";
+    }
+    if (!customerPhone.trim()) {
+      errors.customerPhone = "Nomor telepon aktif wajib diisi.";
+    } else if (!/^[0-9+() -]{9,18}$/.test(customerPhone.trim())) {
+      errors.customerPhone = "Nomor telepon tidak valid (minimal 9 digit).";
+    }
+    if (!manualAddress.trim()) {
+      errors.manualAddress = "Alamat lengkap wajib diisi.";
+    } else if (manualAddress.trim().length < 8) {
+      errors.manualAddress = "Alamat terlalu singkat, tuliskan minimal 8 karakter dengan patokan.";
+    }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    if (!validateStep5()) {
+      e.preventDefault();
     }
   };
 
@@ -256,7 +301,7 @@ export function BookingForm({
         })}
       </nav>
 
-      <form action={formAction} className="booking-form-layout">
+      <form action={formAction} noValidate onSubmit={handleFormSubmit} className="booking-form-layout">
         <div className="booking-form-fields">
           {state.error && (
             <div className="customer-notice customer-notice-error" role="alert">
@@ -541,10 +586,16 @@ export function BookingForm({
                       min={today}
                       value={bookingDate}
                       onChange={(e) => handleDateChange(e.target.value)}
-                      required
-                      className="customer-field"
+                      aria-invalid={Boolean(fieldErrors.bookingDate)}
+                      aria-describedby={fieldErrors.bookingDate ? "bookingDate-error" : undefined}
+                      className={`customer-field ${fieldErrors.bookingDate ? "customer-field-error" : ""}`}
                     />
                   </label>
+                  {fieldErrors.bookingDate && (
+                    <p id="bookingDate-error" className="field-error-text" role="alert">
+                      ⚠️ {fieldErrors.bookingDate}
+                    </p>
+                  )}
                   <p className="field-hint">Pemesanan tersedia mulai hari ini atau hari kerja berikutnya.</p>
                 </div>
 
@@ -565,7 +616,10 @@ export function BookingForm({
                           key={slot}
                           type="button"
                           disabled={!isAvail}
-                          onClick={() => setStartTime(slot)}
+                          onClick={() => {
+                            setStartTime(slot);
+                            setFieldErrors((prev) => ({ ...prev, startTime: "" }));
+                          }}
                           className={`time-slot-chip ${isSelected ? "is-selected" : ""} ${!isAvail ? "is-slot-full" : ""}`}
                         >
                           <span className="slot-hour">{slot}</span>
@@ -576,6 +630,11 @@ export function BookingForm({
                       );
                     })}
                   </div>
+                  {fieldErrors.startTime && (
+                    <p id="startTime-error" className="field-error-text" role="alert">
+                      ⚠️ {fieldErrors.startTime}
+                    </p>
+                  )}
                   <p className="field-hint">Jam operasional standar: 08:00 – 17:00 WIB.</p>
                 </div>
               </div>
@@ -610,8 +669,7 @@ export function BookingForm({
                 <button
                   type="button"
                   className="customer-button customer-button-primary"
-                  disabled={!bookingDate || !startTime}
-                  onClick={() => setCurrentStep(5)}
+                  onClick={handleStep4Next}
                 >
                   Lanjut ke Alamat & Review <span aria-hidden="true">→</span>
                 </button>
@@ -663,11 +721,20 @@ export function BookingForm({
                   <input
                     type="text"
                     value={addressLabel}
-                    onChange={(e) => setAddressLabel(e.target.value)}
+                    onChange={(e) => {
+                      setAddressLabel(e.target.value);
+                      setFieldErrors((prev) => ({ ...prev, addressLabel: "" }));
+                    }}
                     placeholder="Contoh: Rumah Tinggal, Apartemen Sudirman, Kantor"
-                    className="customer-field"
-                    required
+                    className={`customer-field ${fieldErrors.addressLabel ? "customer-field-error" : ""}`}
+                    aria-invalid={Boolean(fieldErrors.addressLabel)}
+                    aria-describedby={fieldErrors.addressLabel ? "addressLabel-error" : undefined}
                   />
+                  {fieldErrors.addressLabel && (
+                    <p id="addressLabel-error" className="field-error-text" role="alert">
+                      ⚠️ {fieldErrors.addressLabel}
+                    </p>
+                  )}
                 </label>
 
                 <label className="customer-field-label">
@@ -675,24 +742,42 @@ export function BookingForm({
                   <input
                     type="tel"
                     value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    onChange={(e) => {
+                      setCustomerPhone(e.target.value);
+                      setFieldErrors((prev) => ({ ...prev, customerPhone: "" }));
+                    }}
                     placeholder="Contoh: 081234567890"
-                    className="customer-field"
-                    required
+                    className={`customer-field ${fieldErrors.customerPhone ? "customer-field-error" : ""}`}
+                    aria-invalid={Boolean(fieldErrors.customerPhone)}
+                    aria-describedby={fieldErrors.customerPhone ? "customerPhone-error" : undefined}
                   />
+                  {fieldErrors.customerPhone && (
+                    <p id="customerPhone-error" className="field-error-text" role="alert">
+                      ⚠️ {fieldErrors.customerPhone}
+                    </p>
+                  )}
                 </label>
 
                 <label className="customer-field-label full-width">
                   Alamat Lengkap
                   <textarea
                     value={manualAddress}
-                    onChange={(e) => setManualAddress(e.target.value)}
+                    onChange={(e) => {
+                      setManualAddress(e.target.value);
+                      setFieldErrors((prev) => ({ ...prev, manualAddress: "" }));
+                    }}
                     placeholder="Nama jalan, nomor rumah/unit, RT/RW, kelurahan, kecamatan, kota, patokan lokasi"
                     minLength={8}
                     maxLength={500}
-                    className="customer-field customer-textarea"
-                    required
+                    className={`customer-field customer-textarea ${fieldErrors.manualAddress ? "customer-field-error" : ""}`}
+                    aria-invalid={Boolean(fieldErrors.manualAddress)}
+                    aria-describedby={fieldErrors.manualAddress ? "manualAddress-error" : undefined}
                   />
+                  {fieldErrors.manualAddress && (
+                    <p id="manualAddress-error" className="field-error-text" role="alert">
+                      ⚠️ {fieldErrors.manualAddress}
+                    </p>
+                  )}
                 </label>
 
                 {/* Catatan untuk cleaner (Tahap 11 Spec) */}
@@ -778,10 +863,17 @@ export function BookingForm({
                 </button>
                 <button
                   type="submit"
-                  disabled={pending || !manualAddress || manualAddress.length < 8}
-                  className="customer-button customer-button-primary booking-submit-btn"
+                  disabled={pending}
+                  className="customer-button customer-button-primary booking-submit-btn flex items-center justify-center gap-2"
                 >
-                  {pending ? "Memproses Pemesanan…" : "Konfirmasi Booking"}
+                  {pending ? (
+                    <>
+                      <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+                      <span>Memproses Pemesanan…</span>
+                    </>
+                  ) : (
+                    "Konfirmasi Booking"
+                  )}
                 </button>
               </div>
             </fieldset>

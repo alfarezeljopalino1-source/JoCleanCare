@@ -74,10 +74,17 @@ export default async function CustomerChatPage({
 
       // Check assigned staff
       const activeSchedule = b.staff_schedules?.find(
-        (s) => s.status !== "cancelled" && s.staff?.name,
+        (s) => {
+          const st = (Array.isArray(s.staff) ? s.staff[0] : s.staff) as { name?: string; phone?: string | null } | null;
+          return s.status !== "cancelled" && Boolean(st?.name);
+        },
       );
 
-      if (activeSchedule?.staff) {
+      const staffMember = activeSchedule
+        ? (Array.isArray(activeSchedule.staff) ? activeSchedule.staff[0] : activeSchedule.staff)
+        : null;
+
+      if (staffMember) {
         // Staff assigned -> initialize/get staff room
         const staffRoomId = await getOrCreateStaffRoom(supabase, b.id);
         let unread = 0;
@@ -97,8 +104,8 @@ export default async function CustomerChatPage({
           serviceName,
           scheduledDate: b.booking_date,
           startTime: String(b.start_time).slice(0, 5),
-          staffName: activeSchedule.staff.name,
-          staffPhone: activeSchedule.staff.phone,
+          staffName: staffMember.name,
+          staffPhone: staffMember.phone,
           roomId: staffRoomId,
           unreadCount: unread,
         });
@@ -186,9 +193,14 @@ export default async function CustomerChatPage({
                 Pilih ruang percakapan untuk menghubungi tim Customer Support atau Petugas di lapangan.
               </p>
             </div>
-            <Link href="/orders" className="customer-button customer-button-secondary text-xs">
-              ← Kembali ke Pesanan
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link href="/dashboard" className="customer-back-link">
+                <span aria-hidden="true">←</span> Dashboard
+              </Link>
+              <Link href="/orders" className="customer-button customer-button-secondary text-xs">
+                Pesanan
+              </Link>
+            </div>
           </div>
         </header>
 

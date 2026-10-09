@@ -11,13 +11,13 @@ import {
 } from "../../../lib/bookings";
 import { requireRole } from "../../../lib/auth/session";
 import {
-  cancelBookingAction,
   rescheduleBookingAction,
   submitReviewAction,
   toggleFavoriteCleanerAction,
 } from "../../actions/bookings";
 import { getOrCreateStaffRoom, getRoomMessages } from "../../../lib/chat";
 import { ChatBox } from "../../chat/chat-box";
+import { OrderCancelCard } from "./order-cancel-card";
 
 export const dynamic = "force-dynamic";
 
@@ -257,7 +257,7 @@ export default async function OrderDetailPage({
                 </small>
               </div>
             ) : (
-              <form action={submitReviewAction} className="review-form">
+              <form action={submitReviewAction} noValidate className="review-form">
                 <p>Bagaimana kepuasan Anda terhadap hasil pembersihan ini? Masukan Anda sangat berarti bagi kami.</p>
                 <input type="hidden" name="booking_id" value={booking.id} />
                 {assignedCleaner && <input type="hidden" name="staff_id" value={assignedCleaner.staff_id} />}
@@ -414,7 +414,7 @@ export default async function OrderDetailPage({
               <summary className="reschedule-summary-trigger">
                 📅 Ingin menjadwalkan ulang (reschedule) pesanan ini?
               </summary>
-              <form action={rescheduleBookingAction} className="reschedule-form">
+              <form action={rescheduleBookingAction} noValidate className="reschedule-form">
                 <input type="hidden" name="booking_id" value={booking.id} />
                 <p>
                   Anda dapat mengubah tanggal dan waktu kunjungan selama pesanan masih menunggu konfirmasi atau
@@ -456,34 +456,9 @@ export default async function OrderDetailPage({
           </section>
         )}
 
-        {/* CANCELLATION WORKFLOW (Section 11 / Tahap 20 Spec) */}
+        {/* CANCELLATION WORKFLOW with confirmation dialog */}
         {canCancel && (
-          <section className="order-cancel-section">
-            <details className="cancel-details-dropdown">
-              <summary className="cancel-summary-trigger">
-                Ingin membatalkan pesanan ini?
-              </summary>
-              <form action={cancelBookingAction} className="cancel-form">
-                <input type="hidden" name="booking_id" value={booking.id} />
-                <p>
-                  Pembatalan gratis dapat dilakukan selama pesanan masih berstatus Menunggu Konfirmasi atau
-                  Dikonfirmasi sebelum petugas berangkat.
-                </p>
-                <label className="customer-field-label">
-                  Alasan Pembatalan
-                  <select name="cancellation_reason" required className="customer-field">
-                    <option value="Perubahan jadwal / urusan mendadak">Perubahan jadwal / urusan mendadak</option>
-                    <option value="Salah memilih layanan atau waktu">Salah memilih layanan atau waktu</option>
-                    <option value="Sudah dibersihkan sendiri">Sudah dibersihkan sendiri</option>
-                    <option value="Lainnya">Lainnya</option>
-                  </select>
-                </label>
-                <button type="submit" className="customer-button cancel-submit-button">
-                  Konfirmasi Batalkan Pesanan
-                </button>
-              </form>
-            </details>
-          </section>
+          <OrderCancelCard bookingId={booking.id} bookingCode={bookingCode} />
         )}
       </div>
     </main>

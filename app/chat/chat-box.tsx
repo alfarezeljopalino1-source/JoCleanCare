@@ -5,6 +5,20 @@ import { createClient } from "../../lib/supabase/client";
 import { sendChatMessageAction, markChatRoomReadAction } from "../actions/chat";
 import type { ChatMessage } from "../../lib/chat";
 
+function formatMessageTime(value?: string | null): string {
+  if (!value || typeof value !== "string" || !value.trim()) return "—";
+  const date = new Date(value.trim());
+  if (Number.isNaN(date.getTime())) return "—";
+  try {
+    return date.toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "—";
+  }
+}
+
 export function ChatBox({
   roomId,
   initialMessages,
@@ -25,14 +39,14 @@ export function ChatBox({
   returnUrl?: string;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [prevRoomId, setPrevRoomId] = useState(roomId);
+  if (roomId !== prevRoomId) {
+    setPrevRoomId(roomId);
+    setMessages(initialMessages);
+  }
   const [inputMessage, setInputMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Sync initial messages when roomId changes
-  useEffect(() => {
-    setMessages(initialMessages);
-  }, [roomId, initialMessages]);
 
   // Scroll to bottom on message updates
   useEffect(() => {
@@ -198,10 +212,7 @@ export function ChatBox({
                         isMe ? "text-teal-200" : "text-gray-400"
                       }`}
                     >
-                      {new Date(msg.created_at).toLocaleTimeString("id-ID", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatMessageTime(msg.created_at)}
                     </span>
                   </div>
                   <p className="whitespace-pre-wrap leading-relaxed text-[13px]">{msg.message}</p>

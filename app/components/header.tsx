@@ -5,10 +5,11 @@ import { getSignedInProfile } from "../../lib/auth/session";
 
 export async function Header() {
   const current = await getSignedInProfile();
+  const homeHref = current ? dashboardForRole(current.profile.role) : "/";
   return (
     <header className="site-header">
       <nav aria-label="Navigasi utama" className="site-nav">
-        <Link href="/" className="customer-brand" aria-label="JoCleanCare, beranda">
+        <Link href={homeHref} className="customer-brand" aria-label="JoCleanCare, beranda">
           <span className="brand-mark" aria-hidden="true">
             <span />
             <span />

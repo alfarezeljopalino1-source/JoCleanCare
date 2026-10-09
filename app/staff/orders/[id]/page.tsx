@@ -127,7 +127,7 @@ export default async function StaffJobDetailPage({
             </p>
 
             {schedStatus === "scheduled" && (
-              <form action={updateStaffJobStatusAction} className="staff-action-form">
+              <form action={updateStaffJobStatusAction} noValidate className="staff-action-form">
                 <input type="hidden" name="schedule_id" value={job.schedule_id} />
                 <input type="hidden" name="booking_id" value={job.booking_id} />
                 <input type="hidden" name="status" value="accepted" />
@@ -139,7 +139,7 @@ export default async function StaffJobDetailPage({
             )}
 
             {schedStatus === "accepted" && (
-              <form action={updateStaffJobStatusAction} className="staff-action-form">
+              <form action={updateStaffJobStatusAction} noValidate className="staff-action-form">
                 <input type="hidden" name="schedule_id" value={job.schedule_id} />
                 <input type="hidden" name="booking_id" value={job.booking_id} />
                 <input type="hidden" name="status" value="in_progress" />
@@ -151,7 +151,7 @@ export default async function StaffJobDetailPage({
             )}
 
             {schedStatus === "in_progress" && (
-              <form action={updateStaffJobStatusAction} className="staff-action-form">
+              <form action={updateStaffJobStatusAction} noValidate className="staff-action-form">
                 <input type="hidden" name="schedule_id" value={job.schedule_id} />
                 <input type="hidden" name="booking_id" value={job.booking_id} />
                 <input type="hidden" name="status" value="completed" />

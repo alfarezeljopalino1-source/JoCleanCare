@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 export function LandingInteractions() {
-  const [activeStep, setActiveStep] = useState(0);
+  const [, setActiveStep] = useState(0);
 
   useEffect(() => {
     // Respect reduced motion preference

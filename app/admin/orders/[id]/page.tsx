@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "../../../../lib/auth/session";
 import {
-  adminCancelBookingAction,
   adminRescheduleBookingAction,
   assignStaffAction,
   setBookingStatusAction,
@@ -17,6 +16,7 @@ import {
   StatusBadge,
   statusLabels,
 } from "../../_components/admin-ui";
+import { AdminCancelCard } from "./admin-cancel-card";
 
 export const dynamic = "force-dynamic";
 
@@ -275,7 +275,7 @@ export default async function AdminOrderDetailPage({
                 <summary className="font-semibold text-teal-700 cursor-pointer">
                   🗓️ Ubah Jadwal Booking (Admin Reschedule)
                 </summary>
-                <form action={adminRescheduleBookingAction} className="mt-2 space-y-2 p-3 bg-gray-50 rounded">
+                <form action={adminRescheduleBookingAction} noValidate className="mt-2 space-y-2 p-3 bg-gray-50 rounded">
                   <input type="hidden" name="booking_id" value={row.id} />
                   <div className="grid grid-cols-2 gap-2">
                     <label>
@@ -293,27 +293,7 @@ export default async function AdminOrderDetailPage({
                 </form>
               </details>
 
-              <details className="text-xs">
-                <summary className="font-semibold text-red-700 cursor-pointer">
-                  ⚠️ Batalkan Booking (Admin Cancel)
-                </summary>
-                <form action={adminCancelBookingAction} className="mt-2 space-y-2 p-3 bg-red-50 rounded">
-                  <input type="hidden" name="booking_id" value={row.id} />
-                  <label>
-                    Alasan Pembatalan
-                    <textarea
-                      name="cancellation_reason"
-                      rows={2}
-                      maxLength={500}
-                      required
-                      placeholder="Tulis alasan pembatalan (misal: permintaan pelanggan via telepon, kendala cuaca, dsb.)"
-                    />
-                  </label>
-                  <button type="submit" className="admin-button admin-button-compact bg-red-700 text-white hover:bg-red-800">
-                    Konfirmasi Pembatalan Booking
-                  </button>
-                </form>
-              </details>
+              <AdminCancelCard bookingId={row.id} />
             </div>
           )}
 
@@ -366,7 +346,7 @@ export default async function AdminOrderDetailPage({
         )}
 
         {["confirmed", "assigned"].includes(row.status) && (
-          <form action={assignStaffAction} className="admin-card admin-assignment-form">
+          <form action={assignStaffAction} noValidate className="admin-card admin-assignment-form">
             <h3>Jadwalkan / Tugaskan Petugas</h3>
             <input type="hidden" name="booking_id" value={row.id} />
             <label>
